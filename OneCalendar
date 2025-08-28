@@ -10,9 +10,9 @@
 <style>
   :root{
     --bg:#0f1115; --card:#161a22; --muted:#9aa3b2; --text:#e6ebf5; --chip:#1e2531; --accent:#5aa1ff; --warn:#e6a700;
-    /* more distinct palette (SupplyPro teal blue/green as requested) */
+    /* distinct palette (SupplyPro teal) */
     --bwp:#7c4dff;      /* violet */
-    --sp:#00b3b8;       /* teal blue/green */
+    --sp:#00b3b8;       /* teal */
     --vend:#ff8a00;     /* orange */
     --ashton:#e91e63;   /* pink/red */
   }
@@ -22,9 +22,7 @@
   .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .card{ background:var(--card); border:1px solid #242c3a; border-radius:12px; padding:12px; }
   .file{ background:#0f1420; border:1px dashed #344055; border-radius:10px; padding:10px; }
-  input[type="date"], input[type="text"], input[type="file"], select, textarea{
-    background:#0e131c; color:var(--text); border:1px solid #2b3446; border-radius:8px; padding:6px 8px;
-  }
+  input[type="date"], input[type="text"], input[type="file"], select, textarea{ background:#0e131c; color:var(--text); border:1px solid #2b3446; border-radius:8px; padding:6px 8px; }
   label{ color:#d2d8e4; font-size:14px; }
   .btn{ background:#1a2230; color:#dfe7f6; border:1px solid #2f3a4f; padding:6px 10px; border-radius:8px; cursor:pointer; }
   .btn:active{ transform:translateY(1px); }
@@ -54,11 +52,11 @@
   .fc .fc-list-event:hover td { background:#1a2230 !important; }
   .fc .fc-list-event:hover a { color:inherit !important; }
 
-  /* Make month view text compact and clipped so it never bleeds into the next day cell */
+  /* keep month text inside its cell */
   .fc .fc-daygrid-event { min-height:18px; padding:0 4px; border-radius:4px; }
   .fc .evt-text { color:var(--text); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; line-height:1.15; }
 
-  /* Better sticky headers (fix white overlay issue when scrolling) */
+  /* sticky headers fix (white overlay) */
   .fc .fc-scrollgrid-section-sticky > *{ background:#0c1320 !important; color:#eaf2ff !important; }
   .fc-theme-standard .fc-scrollgrid,
   .fc-theme-standard td, .fc-theme-standard th { border-color:#2a3346; }
@@ -83,7 +81,7 @@
   .drawer header{ padding:12px; border-bottom:1px solid #2a3346; display:flex; justify-content:space-between; align-items:center; }
   .drawer .content{ padding:12px; gap:10px; display:flex; flex-direction:column; overflow:auto; }
   .drawer .content label{ font-size:12px; color:#a7b2c6; }
-  .drawer .content input[type="text"], .drawer .content textarea{ width:100%; background:#0e131c; color:var(--text); border:1px solid #2b3446; border-radius:8px; padding:6px 8px; }
+  .drawer .content input[type="text"], .drawer .content textarea{ width:100%; background:#0e131c; color:#var(--text); border:1px solid #2b3446; border-radius:8px; padding:6px 8px; }
   .drawer footer{ margin-top:auto; padding:12px; border-top:1px solid #2a3346; display:flex; gap:8px; justify-content:flex-end; }
   .mini{ font-size:12px; color:#a7b2c6; }
   .mi-item{ display:flex; align-items:center; gap:6px; padding:4px 0; }
@@ -129,6 +127,16 @@
       </div>
     </div>
     <div class="status" id="status"></div>
+  </div>
+
+  <!-- Cloud Sync (shared workspace) -->
+  <div class="panel card">
+    <div class="row" style="gap:8px; align-items:center;">
+      <strong>Cloud Sync</strong>
+      <input id="wsId" type="text" placeholder="Workspace ID (e.g. team-alpha)" style="width:220px;">
+      <button class="btn" id="wsConnect">Connect</button>
+      <span id="wsStatus" class="muted"></span>
+    </div>
   </div>
 
   <div class="panel card">
@@ -242,7 +250,6 @@ function lc(s){ return String(s||"").toLowerCase(); }
 function parseDate(s){
   if(s==null) return null;
   s=String(s).trim();
-  // if two timestamps in one cell (Ashton), take the last date-like substring
   if(/\d{4}-\d{2}-\d{2}/.test(s) && s.includes('\n')){ const parts=s.split(/\n/).map(x=>x.trim()).filter(Boolean); s=parts[parts.length-1]; }
   const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
   if(m1){ let y=+m1[3]; if(y<100){ y=y<70?2000+y:1900+y; } return new Date(y, +m1[1]-1, +m1[2]); }
@@ -272,29 +279,24 @@ function titleCaseStreet(s){
 function cleanSupplyProAddress(raw){
   let s = deExcelCell(raw).replace(/_/g,' ').replace(/\s{2,}/g,' ').trim();
   if(!s) return "";
-  // Repair stray commas inside a word: "C, olumbus" -> "Columbus"
+  // Repair stray commas inside a word
   s = s.replace(/\b([A-Za-z]),\s*([A-Za-z])/g, '$1$2');
 
-  // Try to keep "City, ST" tail
   const tail = s.match(/([A-Za-z .'-]+,\s*[A-Z]{2})(?:\s*\d{5}(?:-\d{4})?)?\s*$/);
   const cityTail = tail ? tail[1] : "";
 
   let left = cityTail ? s.slice(0, tail.index).trim() : s;
 
-  // find all occurrences that look like street starts
   const idxs = []; const re=/\b\d{1,6}\s+[A-Za-z]/g; let m;
   while((m=re.exec(left))) idxs.push(m.index);
   if(!idxs.length) return titleCaseStreet((left + (cityTail? " "+cityTail:"")).trim());
 
-  // choose the LAST one (SupplyPro duplicates)
   let street = left.slice(idxs[idxs.length-1]).trim();
 
-  // Normalize final suffix AV/AV. -> AVE
   street = street.replace(/\bAV\b\.?$/i,'AVE')
                  .replace(/\bAV\b\.?\s/i,'AVE ')
                  .replace(/\bAVENUE\b/i,'AVE');
 
-  // De-duplicate if street appears twice
   street = street.replace(/^(\d{1,6}\s+[A-Za-z0-9' .-]+)\s+\1\b/i,'$1');
 
   const out = (street + (cityTail ? " " + cityTail : "")).replace(/\s{2,}/g,' ').trim();
@@ -381,7 +383,6 @@ function taskKey(s){
 
 /* ======================= Ashton Portal normalize ======================= */
 function normalizeAshtonRow(rec){
-  // columns
   const kLotId = findCol(rec,/^Lot\s*ID$/i);
   const kProjId = findCol(rec,/^Project\s*ID$/i);
   const kMarketing = findCol(rec,/^Project\s*Marketing\s*Name$/i);
@@ -424,7 +425,6 @@ function normalizeStartsRow(rec, hint){
   if(typeof hint === 'string'){ sourceType = hint; }
   else if(hint && typeof hint === 'object'){ sourceType = hint.source || ""; vendorLabel = hint.vendorLabel || ""; }
 
-  // Ashton handled separately
   if(sourceType==="ASHTON PORTAL") return normalizeAshtonRow(rec);
 
   const kSub = findCol(rec,/^Subdivision$/i,/^Community$/i,/^Neighborhood$/i,/^Subdivision\s*Name$/i,/^Project$/i);
@@ -530,7 +530,6 @@ async function parseStartsCsv(file, hint){
     realHint = { source: "VENDOR SUITE", vendorLabel: vendorLabelFromFilename(name) };
   }
 
-  // Ashton Portal: headers are stable; no header autodetect needed
   if(hint==="ASHTON PORTAL"){
     const norm = rows.map(r=> normalizeStartsRow(r, "ASHTON PORTAL")).filter(Boolean);
     log(`Loaded ${norm.length} rows from Ashton Portal`,"ok");
@@ -662,7 +661,8 @@ const LS_KEYS = {
   MISSING: 'starts_missing_v1',
   ATTACH: 'starts_attach_v1',
   SEEN_CHANGES_AT: 'starts_seen_changes_at_v1',
-  UNCOMPLETE_REASONS: 'starts_uncomplete_reasons_v1'
+  UNCOMPLETE_REASONS: 'starts_uncomplete_reasons_v1',
+  WS_ID: 'starts_ws_id'
 };
 function loadJSON(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch{ return fallback; } }
 function saveJSON(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
@@ -690,7 +690,7 @@ function makeJobIdFromStoreItem(it){
   return parts.join('|');
 }
 
-/* store migration: collapse old task variants into new keys */
+/* store migration */
 function migrateStoreKeys(){
   const store = loadStore();
   const changelog = loadChangelog();
@@ -768,7 +768,7 @@ function getHistoryForId(id){
 function lastMoveDirection(id){
   const h = getHistoryForId(id);
   if(!h.length) return null;
-  let dir = null; // 'forward' (earlier) or 'back'
+  let dir = null;
   const last = h[h.length-1];
   const a = parseDate(last.from), b = parseDate(last.to);
   if(a && b){
@@ -946,7 +946,6 @@ async function run(){
     const rowsSelected = STARTS_ROWS_ALL.filter(r=> isTaskSelected(r.task, opts));
     mergeIntoStore(dedupeRows(rowsSelected));
 
-    // collapse legacy keys so old variants don't duplicate
     migrateStoreKeys();
 
     const dFrom = parseDate(document.getElementById('dFrom').value);
@@ -957,7 +956,6 @@ async function run(){
     const removed = before - rows.length;
     STARTS_ROWS_VIEW = rows;
 
-    // attention banner: unresolved missing + new date changes since last review
     attentionBanner();
 
     log(`After filters: ${rows.length} rows` , rows.length ? "ok" : "warn");
@@ -968,6 +966,9 @@ async function run(){
     renderResults(group);
     populateSubdatalist();
     rebuildCalendar();
+
+    // schedule push of the freshly merged state to cloud (if connected)
+    AzureSync.schedulePush?.();
   }catch(e){
     log("Run failed: "+e.message, "warn");
   }
@@ -1074,11 +1075,10 @@ function getEventsForCalendar(){
     }
   }
 
-  // Pass 1: exact id+date
+  // exact id+date
   const seen = new Set(); const step1 = [];
   for(const e of events){ const k = e.id + "|" + e.start; if(seen.has(k)) continue; seen.add(k); step1.push(e); }
-
-  // Pass 2: collapse cosmetic variants by lot/date/source/category
+  // collapse by lot/date/source/category
   const seen2 = new Set(); const deduped = [];
   for(const e of step1){
     const p = e.extendedProps||{};
@@ -1135,7 +1135,6 @@ function renderCalendar(events){
 
     eventDidMount: (info) => {
       const p = info.event.extendedProps || {};
-      // tooltip
       const lines = [
         `Date: ${fmtLong(info.event.start)}`,
         p.builder && `Builder: ${p.builder}`,
@@ -1150,14 +1149,12 @@ function renderCalendar(events){
       ].filter(Boolean);
       info.el.title = lines.join('\n');
 
-      // color by source/builder
       const key = getColorKeyForEvent(info.event);
       const color = pickColor(key, getColorBy());
       info.el.style.backgroundColor = color;
       info.el.style.borderColor = color;
       const dot = info.el.querySelector('.fc-list-event-dot'); if(dot) dot.style.borderColor = color;
 
-      // Moved badge
       if(p.movedCount>0){
         const b = document.createElement('span');
         b.className = 'moved-badge ' + (p.movedDir||'mixed');
@@ -1181,7 +1178,7 @@ function renderCalendar(events){
 }
 function gotoDate(iso){ if(_calendarInstance && iso){ _calendarInstance.gotoDate(iso); } }
 
-/* ======================= Drawer: notes, missing, attachments, history, completed ======================= */
+/* ======================= Drawer etc. ======================= */
 function renderHistoryList(id){
   const box = document.getElementById('dHistory'); box.innerHTML="";
   const hist = getHistoryForId(id);
@@ -1195,7 +1192,6 @@ function renderHistoryList(id){
       box.appendChild(line);
     });
   }
-  // Also show any “un-completed” reason (time in local tz)
   const reasons = loadUncompleteReasons();
   const rec = reasons[id];
   if(rec && rec.reason){
@@ -1237,7 +1233,6 @@ document.getElementById('drawerSave').addEventListener('click', ()=>{
   const prev = isCompleted(id);
   if(prev !== wantCompleted){
     if(prev && !wantCompleted){
-      // un-complete requires reason
       const reason = prompt("Provide a reason for marking this job NOT completed:");
       if(!reason || !reason.trim()){
         document.getElementById('dCompleted').checked = true;
@@ -1251,10 +1246,12 @@ document.getElementById('drawerSave').addEventListener('click', ()=>{
     if(wantCompleted) classes.add('completed'); else classes.delete('completed');
     _currentDrawer.setProp('classNames', Array.from(classes));
     if(document.getElementById('hideCompleted').checked){ rebuildCalendar(); }
+    AzureSync.schedulePush?.();
   }
   const notes = loadNotes();
   notes[id] = document.getElementById('dNotes').value;
   saveNotes(notes);
+  AzureSync.schedulePush?.();
   closeDrawer();
 });
 
@@ -1267,12 +1264,12 @@ function renderMissingList(id){
     const row = document.createElement('div'); row.className='mi-item';
     const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.done;
     cb.addEventListener('change', ()=>{
-      const all = loadMissing(); all[id][idx].done = cb.checked; saveMissing(all); rebuildCalendar();
+      const all = loadMissing(); all[id][idx].done = cb.checked; saveMissing(all); rebuildCalendar(); AzureSync.schedulePush?.();
     });
     const txt = document.createElement('span'); txt.textContent = it.text;
     const rm = document.createElement('button'); rm.className='btn'; rm.textContent='Remove';
     rm.addEventListener('click', ()=>{
-      const all = loadMissing(); all[id].splice(idx,1); saveMissing(all); renderMissingList(id); rebuildCalendar();
+      const all = loadMissing(); all[id].splice(idx,1); saveMissing(all); renderMissingList(id); rebuildCalendar(); AzureSync.schedulePush?.();
     });
     row.append(cb, txt, rm); list.appendChild(row);
   });
@@ -1284,12 +1281,12 @@ document.getElementById('miAdd').addEventListener('click', ()=>{
   if(!val) return;
   const all = loadMissing(); if(!all[id]) all[id]=[];
   all[id].push({ text: val, done:false, addedAt:nowISO() }); saveMissing(all);
-  document.getElementById('miText').value=""; renderMissingList(id); rebuildCalendar();
+  document.getElementById('miText').value=""; renderMissingList(id); rebuildCalendar(); AzureSync.schedulePush?.();
 });
 document.getElementById('miMarkAll').addEventListener('click', ()=>{
   if(!_currentDrawer) return; const id=_currentDrawer.id;
   const all = loadMissing(); if(!all[id]) return;
-  all[id].forEach(x=>x.done=true); saveMissing(all); renderMissingList(id); rebuildCalendar();
+  all[id].forEach(x=>x.done=true); saveMissing(all); renderMissingList(id); rebuildCalendar(); AzureSync.schedulePush?.();
 });
 
 /* Attachments (DataURLs) */
@@ -1304,7 +1301,7 @@ function renderAttachList(id){
     const dl = document.createElement('a'); dl.href=a.data||"#"; dl.download=a.name||"file"; dl.textContent='Open'; dl.className='btn';
     if(!a.data) dl.style.opacity=.5;
     const rm = document.createElement('button'); rm.textContent='Remove'; rm.className='btn';
-    rm.addEventListener('click', ()=>{ const all2=loadAttach(); all2[id].splice(idx,1); saveAttach(all2); renderAttachList(id); });
+    rm.addEventListener('click', ()=>{ const all2=loadAttach(); all2[id].splice(idx,1); saveAttach(all2); renderAttachList(id); AzureSync.schedulePush?.(); });
     right.append(dl, rm); row.append(left, right); box.appendChild(row);
   });
 }
@@ -1316,14 +1313,13 @@ document.getElementById('attFile').addEventListener('change', (e)=>{
   const all = loadAttach(); if(!all[id]) all[id]=[];
   const readers = files.map(f => new Promise(res=>{
     if(f.size > 2*1024*1024){
-      all[id].push({name:f.name, type:f.type, size:f.size, data:null, addedAt:nowISO()});
-      return res();
+      all[id].push({name:f.name, type:f.type, size:f.size, data:null, addedAt:nowISO()}); return res();
     }
     const r = new FileReader();
     r.onload = ()=>{ all[id].push({name:f.name, type:f.type, size:f.size, data:r.result, addedAt:nowISO()}); res(); };
     r.readAsDataURL(f);
   }));
-  Promise.all(readers).then(()=>{ saveAttach(all); renderAttachList(id); e.target.value=""; });
+  Promise.all(readers).then(()=>{ saveAttach(all); renderAttachList(id); e.target.value=""; AzureSync.schedulePush?.(); });
 });
 
 /* ======================= Subdivision filters ======================= */
@@ -1463,6 +1459,7 @@ function importBackup(file){
       const by = loadJSON(LS_KEYS.COLORBY, "source");
       const r = document.querySelector(`input[name="colorby"][value="${by}"]`); if(r) r.checked = true;
       rebuildCalendar();
+      AzureSync.schedulePush?.();
     }catch(e){ alert("Import failed: "+e.message); }
   };
   fr.readAsText(file);
@@ -1493,11 +1490,99 @@ function attentionBanner(){
     document.getElementById('ackBanner').onclick = ()=>{
       localStorage.setItem(LS_KEYS.SEEN_CHANGES_AT, nowISO());
       banner.classList.remove('show');
+      AzureSync.schedulePush?.();
     };
   }else{
     banner.classList.remove('show');
   }
 }
+
+/* ======================= Cloud Sync (SWA Functions) ======================= */
+const AzureSync = (()=> {
+  let wsId = null, etag = "", pollT = null, pushing = false;
+
+  async function pull() {
+    if (!wsId) return;
+    const res = await fetch(`/api/state?workspaceId=${encodeURIComponent(wsId)}`, {
+      method: 'GET',
+      headers: etag ? { 'If-None-Match': etag } : {}
+    });
+    if (res.status === 304) return;
+    if (!res.ok) { document.getElementById('wsStatus').textContent = `Pull error ${res.status}`; return; }
+    const j = await res.json();
+    etag = j.etag || "";
+    if (j.state && typeof j.state === 'object') {
+      if (j.state.store) localStorage.setItem(LS_KEYS.EVENTS, JSON.stringify(j.state.store));
+      if (j.state.completed) localStorage.setItem(LS_KEYS.COMPLETED, JSON.stringify(j.state.completed));
+      if (j.state.changelog) localStorage.setItem(LS_KEYS.CHANGELOG, JSON.stringify(j.state.changelog));
+      if (j.state.notes) localStorage.setItem(LS_KEYS.NOTES, JSON.stringify(j.state.notes));
+      if (j.state.missing) localStorage.setItem(LS_KEYS.MISSING, JSON.stringify(j.state.missing));
+      if (j.state.attachments) localStorage.setItem(LS_KEYS.ATTACH, JSON.stringify(j.state.attachments));
+      if (j.state.seenChangesAt) localStorage.setItem(LS_KEYS.SEEN_CHANGES_AT, j.state.seenChangesAt);
+      rebuildCalendar?.();
+      attentionBanner?.();
+      document.getElementById('wsStatus').textContent = `Synced ${new Date().toLocaleTimeString()}`;
+    }
+  }
+
+  async function pushNow() {
+    if (!wsId || pushing) return;
+    pushing = true;
+    try {
+      const state = {
+        store: loadStore(),
+        completed: loadCompleted(),
+        changelog: loadChangelog(),
+        notes: loadNotes(),
+        missing: loadMissing(),
+        attachments: loadAttach(),
+        seenChangesAt: localStorage.getItem(LS_KEYS.SEEN_CHANGES_AT)||null
+      };
+      const res = await fetch('/api/state', {
+        method: 'POST',
+        headers: {'content-type':'application/json'},
+        body: JSON.stringify({ workspaceId: wsId, state, etag })
+      });
+      if (res.status === 412) { await pull(); return; } // ETag mismatch
+      if (!res.ok) { document.getElementById('wsStatus').textContent = `Save error ${res.status}`; return; }
+      const j = await res.json(); etag = j.etag || "";
+      document.getElementById('wsStatus').textContent = `Saved ${new Date().toLocaleTimeString()}`;
+    } finally { pushing = false; }
+  }
+
+  let pushTimer=null;
+  function schedulePush() {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, 500);
+  }
+
+  function startPolling() {
+    if (pollT) clearInterval(pollT);
+    pollT = setInterval(pull, 3000);
+    pull();
+  }
+
+  async function connect(id) {
+    wsId = (id||"").trim();
+    if(!wsId){ document.getElementById('wsStatus').textContent = 'Enter Workspace ID'; return; }
+    localStorage.setItem(LS_KEYS.WS_ID, wsId);
+    document.getElementById('wsStatus').textContent = 'Connecting…';
+    await pull();
+    startPolling();
+    document.getElementById('wsStatus').textContent = `Connected: ${wsId}`;
+  }
+
+  return { connect, schedulePush, pull, pushNow };
+})();
+
+/* wrap savers so they also push */
+const _saveStore = saveStore, _saveCompleted = saveCompleted, _saveChangelog = saveChangelog, _saveNotes = saveNotes, _saveMissing = saveMissing, _saveAttach = saveAttach;
+window.saveStore = (x)=>{ _saveStore(x); AzureSync.schedulePush(); };
+window.saveCompleted = (x)=>{ _saveCompleted(x); AzureSync.schedulePush(); };
+window.saveChangelog = (x)=>{ _saveChangelog(x); AzureSync.schedulePush(); };
+window.saveNotes = (x)=>{ _saveNotes(x); AzureSync.schedulePush(); };
+window.saveMissing = (x)=>{ _saveMissing(x); AzureSync.schedulePush(); };
+window.saveAttach = (x)=>{ _saveAttach(x); AzureSync.schedulePush(); };
 
 /* ======================= UI wiring ======================= */
 document.getElementById('apply').addEventListener('click', run);
@@ -1567,7 +1652,7 @@ document.getElementById('clear').addEventListener('click', ()=>{
   document.getElementById('calendar').innerHTML="";
   if(_calendarInstance){ _calendarInstance.destroy(); _calendarInstance=null; }
   STARTS_ROWS_ALL=[]; STARTS_ROWS_VIEW=[]; ROWS_84=[]; HEADERS_84=null; PRIMARY_ADDR_COL_84=null;
-  clearSubFilters(); // keep store/completed/notes/missing/attachments/changelog
+  clearSubFilters();
 });
 
 document.getElementById('bwp').addEventListener('change', ()=>{ log("BWP selected.","muted"); run(); });
@@ -1579,6 +1664,22 @@ document.getElementById('s84').addEventListener('change', async (e)=>{ const f =
 ['onlyScreens','onlyDrywall','includeScreens','includeDeliveries'].forEach(id=>{
   document.getElementById(id).addEventListener('change', run);
 });
+
+/* Cloud Sync UI wiring + auto-connect */
+document.getElementById('wsConnect').addEventListener('click', ()=>{
+  const id = normSpace(document.getElementById('wsId').value);
+  AzureSync.connect(id);
+});
+(function autoConnect(){
+  const url = new URL(location.href);
+  const qws = url.searchParams.get('ws') || url.searchParams.get('workspace');
+  const saved = localStorage.getItem(LS_KEYS.WS_ID);
+  const want = qws || saved || "";
+  if(want){
+    document.getElementById('wsId').value = want;
+    AzureSync.connect(want);
+  }
+})();
 
 /* defaults */
 (function initDates(){
