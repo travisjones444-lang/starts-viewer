@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Starts Viewer — BWP + SupplyPro + Vendor + 84SALES + Ashton</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1115; --card:#161a22; --muted:#9aa3b2; --text:#e6ebf5; --chip:#1e2531; --accent:#5aa1ff; --warn:#e6a700;
+    /* distinct palette (SupplyPro teal) */
+    --bwp:#7c4dff;      /* violet */
+    --sp:#00b3b8;       /* teal */
+    --vend:#ff8a00;     /* orange */
+    --ashton:#e91e63;   /* pink/red */
+  }
+  html,body{height:100%; margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text);}
+  .wrap{ max-width:1160px; margin:22px auto; padding:0 14px; }
+  h1{ font-size:20px; margin:0 0 10px; }
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .card{ background:var(--card); border:1px solid #242c3a; border-radius:12px; padding:12px; }
+  .file{ background:#0f1420; border:1px dashed #344055; border-radius:10px; padding:10px; }
+  input[type="date"], input[type="text"], input[type="file"], select, textarea{ background:#0e131c; color:var(--text); border:1px solid #2b3446; border-radius:8px; padding:6px 8px; }
+  label{ color:#d2d8e4; font-size:14px; }
+  .btn{ background:#1a2230; color:#dfe7f6; border:1px solid #2f3a4f; padding:6px 10px; border-radius:8px; cursor:pointer; }
+  .btn:active{ transform:translateY(1px); }
+  .status{ font-size:12px; color:#cfd7e6; background:#0f1420; border:1px solid #2a3346; border-radius:10px; padding:8px; max-height:220px; overflow:auto; }
+  .ok{ color:#79df9b; } .warn{ color:#ff9090; } .muted{ color:#9aa3b2; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 10px; background:var(--chip); border:1px solid #2a3346; border-radius:999px; cursor:pointer; user-select:none; }
+  .chip .count{ background:#101521; border:1px solid #2a3346; color:#a7b2c6; padding:2px 6px; border-radius:999px; font-size:12px; }
+  .chip.selected{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(90,161,255,.15) inset; }
+  .results{ margin-top:14px; display:grid; grid-template-columns: 1fr; gap:8px; }
+  details.joblist{ background:#0f1420; border:1px solid #2a3346; border-radius:12px; padding:8px 10px; }
+  details.joblist > summary{ cursor:pointer; font-weight:600; font-size:14px; list-style:none; }
+  details.joblist > summary::-webkit-details-marker{ display:none; }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ padding:6px; border-bottom:1px solid #20293a; font-size:13px; }
+  th{ background:#131927; position:sticky; top:0; z-index:1; }
+  .pill{ font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid #2a3346; background:#0f1420; }
+
+  .tags{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .tag{ display:inline-flex; gap:6px; align-items:center; background:#0f1420; border:1px solid #2a3346; border-radius:999px; padding:4px 8px; font-size:12px; }
+  .tag button{ all:unset; cursor:pointer; font-weight:700; padding:0 4px; color:#a7b2c6; }
+  .tag button:hover{ color:#fff; }
+
+  #calendar{ background:#0f1420; border:1px solid #2a3346; border-radius:12px; padding:8px; }
+
+  /* FullCalendar tweaks */
+  .fc .fc-list-event:hover td { background:#1a2230 !important; }
+  .fc .fc-list-event:hover a { color:inherit !important; }
+
+  /* keep month text inside its cell */
+  .fc .fc-daygrid-event { min-height:18px; padding:0 4px; border-radius:4px; }
+  .fc .evt-text { color:var(--text); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; line-height:1.15; }
+
+  /* sticky headers fix (white overlay) */
+  .fc .fc-scrollgrid-section-sticky > *{ background:#0c1320 !important; color:#eaf2ff !important; }
+  .fc-theme-standard .fc-scrollgrid,
+  .fc-theme-standard td, .fc-theme-standard th { border-color:#2a3346; }
+  .fc .fc-daygrid-day-top{ background:transparent; }
+  .fc .fc-daygrid-day-number{ color:var(--text); }
+  .fc .fc-list-day-cushion{ background:#0c1320 !important; color:#eaf2ff !important; font-weight:600; }
+  .fc .fc-list-sticky .fc-list-day > *{ background:#0c1320 !important; }
+
+  /* Completed + missing markers */
+  .fc-event.completed { opacity: 0.45; }
+  tr.completed td { opacity: 0.6; text-decoration: line-through; }
+  .fc-event.has-missing { outline: 2px dashed var(--warn); box-shadow: inset 0 0 0 1px rgba(230,167,0,.6); }
+
+  .moved-badge{ position:absolute; top:-6px; right:-6px; font-size:10px; padding:1px 4px; border-radius:4px; background:#ff5d5d; color:#fff; pointer-events:none; }
+  .moved-badge.forward{ background:#22c55e; }
+  .moved-badge.back{ background:#ef4444; }
+  .moved-badge.mixed{ background:#f59e0b; }
+
+  /* Right drawer */
+  .drawer{ position:fixed; top:0; right:-460px; width:440px; height:100%; background:#0f1420; border-left:1px solid #2a3346; box-shadow:-8px 0 24px rgba(0,0,0,.35); transition:right .22s ease; z-index:9999; display:flex; flex-direction:column; }
+  .drawer.open{ right:0; }
+  .drawer header{ padding:12px; border-bottom:1px solid #2a3346; display:flex; justify-content:space-between; align-items:center; }
+  .drawer .content{ padding:12px; gap:10px; display:flex; flex-direction:column; overflow:auto; }
+  .drawer .content label{ font-size:12px; color:#a7b2c6; }
+  .drawer .content input[type="text"], .drawer .content textarea{ width:100%; background:#0e131c; color:#var(--text); border:1px solid #2b3446; border-radius:8px; padding:6px 8px; }
+  .drawer footer{ margin-top:auto; padding:12px; border-top:1px solid #2a3346; display:flex; gap:8px; justify-content:flex-end; }
+  .mini{ font-size:12px; color:#a7b2c6; }
+  .mi-item{ display:flex; align-items:center; gap:6px; padding:4px 0; }
+  .mi-item input[type="checkbox"]{ transform:scale(1.1); }
+  .att{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0; border-bottom:1px dashed #2a3346; }
+
+  /* banner */
+  .banner{ display:none; position:sticky; top:0; z-index:10000; padding:10px 12px; margin-bottom:10px; border-radius:10px; border:1px solid #523b00; background:linear-gradient(0deg,#1e1600,#2b2105); color:#ffd98a; }
+  .banner.show{ display:block; }
+  .banner strong{ color:#fff; }
+  .legend{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .legend .key{ display:inline-flex; align-items:center; gap:6px; background:#0f1420; border:1px solid #2a3346; border-radius:999px; padding:4px 8px; font-size:12px; }
+  .sw{ width:12px; height:12px; border-radius:3px; border:1px solid rgba(255,255,255,.25); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Starts Viewer — BWP + SupplyPro + Vendor + 84SALES + Ashton</h1>
+
+  <div id="topBanner" class="banner"></div>
+
+  <div class="card">
+    <div class="row">
+      <div class="file">
+        <div><strong>Load CSVs:</strong></div>
+        <div class="row" style="margin-top:6px;">
+          <label>BWP <input id="bwp" type="file" accept=".csv"></label>
+          <label>SupplyPro <input id="sp" type="file" accept=".csv"></label>
+          <label>Vendor Suite (DR North/South/Polk/Lake) <input id="vendor" type="file" accept=".csv" multiple></label>
+          <label>84SALES <input id="s84" type="file" accept=".csv"></label>
+          <label>Ashton Portal <input id="ashton" type="file" accept=".csv"></label>
+          <button class="btn" id="clear">Clear</button>
+        </div>
+      </div>
+      <div class="card row">
+        <label>From <input type="date" id="dFrom"></label>
+        <label>To <input type="date" id="dTo"></label>
+        <label><input type="checkbox" id="includeDeliveries"> Include Deliveries</label>
+        <label><input type="checkbox" id="includeScreens"> Include Screens</label>
+        <label><input type="checkbox" id="onlyScreens"> Screens only</label>
+        <label><input type="checkbox" id="onlyDrywall"> Drywall only</label>
+        <button class="btn" id="apply">Apply</button>
+      </div>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- Cloud Sync (shared workspace) -->
+  <div class="panel card">
+    <div class="row" style="gap:8px; align-items:center;">
+      <strong>Cloud Sync</strong>
+      <input id="wsId" type="text" placeholder="Workspace ID (e.g. team-alpha)" style="width:220px;">
+      <button class="btn" id="wsConnect">Connect</button>
+      <span id="wsStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="panel card">
+    <div class="row" style="justify-content:space-between;">
+      <strong>Subdivisions (click chips to toggle; multiple allowed)</strong>
+      <div class="row" style="gap:8px;">
+        <input id="subSearch" type="text" list="subList" placeholder="Add subdivision filter…">
+        <datalist id="subList"></datalist>
+        <button class="btn" id="filterCal">Add</button>
+        <button class="btn" id="resetFilter">Reset calendar filter</button>
+        <button class="btn" id="exportCsv">Export filtered Starts CSV</button>
+        <button class="btn" id="export84">Export 84SALES matches</button>
+      </div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="tags" id="selectedTags"></div>
+  </div>
+
+  <div class="panel card">
+    <div><strong>Results</strong></div>
+    <div id="results" class="results"></div>
+  </div>
+
+  <div class="panel card">
+    <div class="row" style="justify-content:space-between; align-items:flex-end;">
+      <div class="row" style="gap:12px; align-items:center;">
+        <strong>Calendar</strong>
+        <label><input type="checkbox" id="includeStored" checked> Include prior stored</label>
+        <label><input type="checkbox" id="hideCompleted"> Hide completed</label>
+        <label><input type="checkbox" id="srcBWP" checked> BWP</label>
+        <label><input type="checkbox" id="srcSP" checked> SupplyPro</label>
+        <label><input type="checkbox" id="srcVEND" checked> Vendor Suite</label>
+        <label><input type="checkbox" id="srcASHTON" checked> Ashton Portal</label>
+      </div>
+      <div class="row" style="gap:8px;">
+        <div class="row" style="gap:8px;">
+          <label>Color by:</label>
+          <label><input type="radio" name="colorby" value="source" checked> Source</label>
+          <label><input type="radio" name="colorby" value="builder"> Builder</label>
+        </div>
+        <button class="btn" id="showCal">Show Calendar</button>
+        <button class="btn" id="exportList">Export List CSV</button>
+        <button class="btn" id="exportICS">Export .ics</button>
+        <button class="btn" id="exportLog">Export date-change log</button>
+        <button class="btn" id="exportBackup">Export Backup</button>
+        <button class="btn" id="importBackupBtn">Import Backup</button>
+        <input id="importBackupFile" type="file" accept="application/json" style="display:none;">
+      </div>
+    </div>
+
+    <div class="legend" id="legend"></div>
+    <div id="calendar" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<!-- Drawer -->
+<aside class="drawer" id="drawer">
+  <header>
+    <div id="drawerTitle" style="font-weight:600;">Event details</div>
+    <button class="btn" id="drawerClose">Close</button>
+  </header>
+  <div class="content">
+    <div><label>Date</label><div id="dDate"></div></div>
+    <div><label>Subdivision</label><div id="dSub"></div></div>
+    <div><label>Lot/Block</label><div id="dLot"></div></div>
+    <div><label>Task</label><div id="dTask"></div></div>
+    <div><label>Builder</label><div id="dBuilder"></div></div>
+    <div><label>Address</label><div id="dAddress"></div></div>
+    <div><label>Source</label><div id="dSource"></div></div>
+    <div><label><input type="checkbox" id="dCompleted"> Mark completed</label></div>
+
+    <div>
+      <label>Notes</label>
+      <textarea id="dNotes" rows="4" placeholder="Add notes…"></textarea>
+    </div>
+
+    <div>
+      <label>Missing items</label>
+      <div class="row">
+        <input id="miText" type="text" placeholder="e.g., 1 slider, 2 SH windows">
+        <button class="btn" id="miAdd">Add</button>
+        <button class="btn" id="miMarkAll">Mark all resolved</button>
+      </div>
+      <div id="miList" class="mini"></div>
+    </div>
+
+    <div>
+      <label>Attachments (max 2MB each)</label>
+      <input id="attFile" type="file" multiple>
+      <div id="attList" class="mini"></div>
+    </div>
+
+    <div>
+      <label>History (date moves)</label>
+      <div id="dHistory" class="mini"></div>
+    </div>
+  </div>
+  <footer>
+    <button class="btn" id="drawerSave">Save</button>
+  </footer>
+</aside>
+
+<script>
+/* ======================= logging & utils ======================= */
+const statusEl = document.getElementById('status');
+function log(msg, cls='muted'){ const d=document.createElement('div'); d.textContent=msg; d.className=cls; statusEl.appendChild(d); statusEl.scrollTop=statusEl.scrollHeight; }
+window.addEventListener('error', e=> log("Error: "+e.message, "warn"));
+
+function normSpace(s){ return String(s||"").replace(/\s+/g,' ').trim(); }
+function lc(s){ return String(s||"").toLowerCase(); }
+function parseDate(s){
+  if(s==null) return null;
+  s=String(s).trim();
+  if(/\d{4}-\d{2}-\d{2}/.test(s) && s.includes('\n')){ const parts=s.split(/\n/).map(x=>x.trim()).filter(Boolean); s=parts[parts.length-1]; }
+  const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m1){ let y=+m1[3]; if(y<100){ y=y<70?2000+y:1900+y; } return new Date(y, +m1[1]-1, +m1[2]); }
+  const d=new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function fmtISO(d){ return d ? (d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0')) : ""; }
+function fmtLong(d){ return d ? d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : ""; }
+function fmtLocalTS(ts){ const d=new Date(ts); return isNaN(d)?String(ts):d.toLocaleString(undefined,{hour12:false}); }
+function nowISO(){ const d=new Date(); return d.toISOString(); }
+function normLot(s){ return normSpace(String(s||"").toLowerCase()); }
+function deExcelCell(v){
+  let t = String(v ?? "").trim();
+  if(/^=\s*".*"$/.test(t)) return t.replace(/^=\s*"(.*)"$/,'$1');
+  if(/^=\s*'.*'$/.test(t)) return t.replace(/^=\s*'(.*)'$/,'$1');
+  if(/^=/.test(t)) return t.replace(/^=/,'').trim();
+  return t;
+}
+
+/* ======================= SupplyPro address normalization ======================= */
+function titleCaseStreet(s){
+  return s.replace(/\w\S*/g,w=>{
+    if(/^(N|S|E|W|NE|NW|SE|SW|FL|\d+)$/.test(w)) return w.toUpperCase();
+    return w[0].toUpperCase() + w.slice(1).toLowerCase();
+  });
+}
+function cleanSupplyProAddress(raw){
+  let s = deExcelCell(raw).replace(/_/g,' ').replace(/\s{2,}/g,' ').trim();
+  if(!s) return "";
+  // Repair stray commas inside a word
+  s = s.replace(/\b([A-Za-z]),\s*([A-Za-z])/g, '$1$2');
+
+  const tail = s.match(/([A-Za-z .'-]+,\s*[A-Z]{2})(?:\s*\d{5}(?:-\d{4})?)?\s*$/);
+  const cityTail = tail ? tail[1] : "";
+
+  let left = cityTail ? s.slice(0, tail.index).trim() : s;
+
+  const idxs = []; const re=/\b\d{1,6}\s+[A-Za-z]/g; let m;
+  while((m=re.exec(left))) idxs.push(m.index);
+  if(!idxs.length) return titleCaseStreet((left + (cityTail? " "+cityTail:"")).trim());
+
+  let street = left.slice(idxs[idxs.length-1]).trim();
+
+  street = street.replace(/\bAV\b\.?$/i,'AVE')
+                 .replace(/\bAV\b\.?\s/i,'AVE ')
+                 .replace(/\bAVENUE\b/i,'AVE');
+
+  street = street.replace(/^(\d{1,6}\s+[A-Za-z0-9' .-]+)\s+\1\b/i,'$1');
+
+  const out = (street + (cityTail ? " " + cityTail : "")).replace(/\s{2,}/g,' ').trim();
+  return titleCaseStreet(out);
+}
+
+/* ======================= Canonical address keys ======================= */
+const SUFFIX_MAP = {
+  'street':'st','st':'st','st.':'st','avenue':'ave','ave':'ave','ave.':'ave','av':'ave',
+  'road':'rd','rd':'rd','rd.':'rd','drive':'dr','dr':'dr','dr.':'dr','lane':'ln','ln':'ln',
+  'court':'ct','ct':'ct','boulevard':'blvd','blvd':'blvd','place':'pl','pl':'pl',
+  'terrace':'ter','ter':'ter','circle':'cir','cir':'cir','parkway':'pkwy','pkwy':'pkwy',
+  'highway':'hwy','hwy':'hwy','trail':'trl','trl':'trl','way':'way','loop':'loop',
+  'path':'path','pass':'pass','row':'row','run':'run','square':'sq','sq':'sq'
+};
+const DIR_MAP = { 'north':'n','n':'n','n.':'n','south':'s','s':'s','s.':'s','east':'e','e':'e','e.':'e','west':'w','w':'w','w.':'w' };
+function canonAddress(s){
+  s = normSpace(String(deExcelCell(s)||"").toLowerCase().replace(/_/g,' '));
+  const preCity = s.split(',')[0];
+  const m = preCity.match(/^(\d{1,6})\s+(.+)$/);
+  if(!m) return "";
+  const num = m[1];
+  let tokens = m[2].split(/\s+/).map(t=> t.replace(/\./g,''));
+  const out = [num];
+  if(tokens.length && DIR_MAP[tokens[0]]){ out.push(DIR_MAP[tokens[0]]); tokens = tokens.slice(1); }
+  const street = [];
+  for(const t of tokens){
+    const short = SUFFIX_MAP[t] || t;
+    street.push(short);
+    if(SUFFIX_MAP[t]) break;
+    if(street.length >= 3) break;
+  }
+  return normSpace(out.concat(street).join(' '));
+}
+function canonAddressShort(s){
+  s = normSpace(String(deExcelCell(s)||"").toLowerCase().replace(/_/g,' '));
+  const preCity = s.split(',')[0];
+  const m = preCity.match(/^(\d{1,6})\s+([a-z0-9'-]+)/i);
+  return m ? (m[1] + " " + m[2].replace(/\./g,'')) : "";
+}
+
+/* ======================= Column helpers ======================= */
+function findCol(rec, ...pats){
+  const keys = Object.keys(rec||{});
+  for(const p of pats){ for(const k of keys){ if(p.test(k)) return k; } }
+  return null;
+}
+
+/* ======================= Vendor helper ======================= */
+function vendorLabelFromFilename(name){
+  const n = (name||"").toLowerCase();
+  if(n.includes("polk")) return "DR POLK";
+  if(n.includes("lake")) return "DR LAKE";
+  if(n.includes("north")) return "DR NORTH";
+  if(n.includes("south")) return "DR SOUTH";
+  if(n.includes("orlando north")) return "DR NORTH";
+  if(n.includes("orlando south")) return "DR SOUTH";
+  return "DR";
+}
+
+/* ======================= Task normalization (strong) ======================= */
+function normalizeTaskTitle(s){
+  let t = deExcelCell(s||"");
+  t = t.replace(/_/g,' ')
+       .replace(/\uFFFD/g,' ')
+       .replace(/[\u2010-\u2015]/g,'-')
+       .replace(/\s{2,}/g,' ')
+       .trim();
+  const L = t.toLowerCase();
+  if(/\bdrywall\b.*\bstock\b/.test(L)) return "Drywall Stock (302)";
+  if(/\bscreen\b.*\b(service|repair|install)\b/.test(L)) return "Screen Service (377)";
+  if(/\binstall\b.*\bwindow/.test(L)) return "Install Windows";
+  return t;
+}
+function taskKey(s){
+  let t = normalizeTaskTitle(s).toLowerCase();
+  t = t.replace(/[_-]/g,' ')
+       .replace(/\[[^\]]*\]/g,'')
+       .replace(/[^\w\s/()]+/g,'')
+       .replace(/\s{2,}/g,' ')
+       .trim();
+  return t;
+}
+
+/* ======================= Ashton Portal normalize ======================= */
+function normalizeAshtonRow(rec){
+  const kLotId = findCol(rec,/^Lot\s*ID$/i);
+  const kProjId = findCol(rec,/^Project\s*ID$/i);
+  const kMarketing = findCol(rec,/^Project\s*Marketing\s*Name$/i);
+  const kTask = findCol(rec,/^Lot\s*Schedule\s*Task$/i);
+  const kDate = findCol(rec,/^Assigned\s*Start\s*Date\/Time$/i);
+  const kAddr = findCol(rec,/^Municipal\s*Address$/i);
+
+  if(!kProjId || !kTask || !kDate) return null;
+
+  const proj = String(rec[kProjId]||"");
+  let lot = "";
+  if(proj.includes('/')) lot = proj.split('/')[1];
+
+  const subdivision = String(rec[kMarketing]||"").trim() || proj.split('/')[0] || "Ashton";
+  const address = normSpace(String(rec[kAddr]||""));
+
+  const tRaw = normalizeTaskTitle(rec[kTask]||"");
+
+  const d = parseDate(rec[kDate]);
+
+  return {
+    subdivision: subdivision,
+    lot: lot,
+    address: address,
+    addressKey: canonAddress(address),
+    addressKeyShort: canonAddressShort(address),
+    task: tRaw,
+    taskKey: taskKey(tRaw),
+    dateRaw: rec[kDate],
+    date: d,
+    builder: "ASHTON WOODS",
+    source: "ASHTON PORTAL"
+  };
+}
+
+/* ======================= Row normalize (BWP, SupplyPro, Vendor) ======================= */
+function normalizeStartsRow(rec, hint){
+  let sourceType = "";
+  let vendorLabel = "";
+  if(typeof hint === 'string'){ sourceType = hint; }
+  else if(hint && typeof hint === 'object'){ sourceType = hint.source || ""; vendorLabel = hint.vendorLabel || ""; }
+
+  if(sourceType==="ASHTON PORTAL") return normalizeAshtonRow(rec);
+
+  const kSub = findCol(rec,/^Subdivision$/i,/^Community$/i,/^Neighborhood$/i,/^Subdivision\s*Name$/i,/^Project$/i);
+  const kLot = findCol(
+    rec,
+    /^Lot\s*\/\s*Block$/i, /^Lot\s*\/\s*Unit$/i,
+    /^Plat\s*Lot\s*\/\s*Block\s*\/\s*Phase$/i, /^Lot\s*\/\s*Block\s*\/\s*Phase$/i, /^Plat\s*Lot\/Block\/Phase$/i,
+    /^Plat\s*Lot$/i, /^Plat$/i, /^Lot$/i, /^Lot\s*#$/i, /^Lot\s*No/i, /^Lot\/Block$/i
+  );
+  const kTask= findCol(rec,/^Task$/i,/^Description$/i);
+  const kDate= findCol(rec,/^Start\s*Date$/i,/^Scheduled\s*Start$/i,/^Schedule\s*Date$/i,/^Date$/i,/^Start$/i,/^Scheduled$/i);
+  const kBuilder = findCol(rec,/^Builder$/i,/^Customer$/i);
+
+  const kJob   = findCol(rec,/^Job$/i);
+  const kAddr1 = findCol(rec,/^Address$/i,/^Address\s*1$/i,/^Job\s*Address$/i,/^Street$/i,/^Street\s*Address$/i,/^Property\s*Address$/i,/^Site\s*Address$/i);
+  const kAddr2 = findCol(rec,/^Address\s*2$/i,/^Address\s*Line\s*2$/i,/^Unit$/i,/^Suite$/i);
+  const kCity  = findCol(rec,/^City$/i);
+  const kState = findCol(rec,/^State$/i);
+
+  if(!kSub || !kTask || !kDate) return null;
+
+  const sub = deExcelCell(rec[kSub]);
+  const lotRaw = deExcelCell(kLot ? rec[kLot] : "");
+
+  let address = "";
+  if(sourceType==="SUPPLYPRO"){
+    let combined = "";
+    if(kJob && rec[kJob]) combined += " " + rec[kJob];
+    if(kAddr1 && rec[kAddr1]) combined += " " + rec[kAddr1];
+    if(kAddr2 && rec[kAddr2]) combined += " " + rec[kAddr2];
+    if(kCity && rec[kCity])   combined += " " + rec[kCity];
+    if(kState && rec[kState]) combined += ", " + rec[kState];
+    address = cleanSupplyProAddress(combined || rec[kJob] || rec[kAddr1] || "");
+  } else {
+    const raw = [kAddr1?rec[kAddr1]:"", kAddr2?rec[kAddr2]:"", kCity?rec[kCity]:"", kState?(", "+rec[kState]):""].filter(Boolean).join(" ");
+    address = normSpace(deExcelCell(raw));
+  }
+
+  let taskRaw = normalizeTaskTitle(deExcelCell(rec[kTask]||"")).trim();
+  let builder = kBuilder ? deExcelCell(rec[kBuilder]||"") : "";
+  if(!builder && sourceType==="VENDOR SUITE") builder = vendorLabel || "";
+
+  return {
+    subdivision: normSpace(sub),
+    lot: normSpace(lotRaw),
+    address,
+    addressKey: canonAddress(address),
+    addressKeyShort: canonAddressShort(address),
+    task: taskRaw,
+    taskKey: taskKey(taskRaw),
+    dateRaw: rec[kDate],
+    date: parseDate(rec[kDate]),
+    builder: builder,
+    source: sourceType || ""
+  };
+}
+
+/* ======================= 84SALES normalize ======================= */
+let HEADERS_84 = null;
+let PRIMARY_ADDR_COL_84 = null;
+function normalize84Row(rec){
+  const kSub = findCol(rec,/^Subdivision$/i,/^Community$/i,/^Neighborhood$/i);
+  const kLot = findCol(rec,/^Lot\s*#?$/i,/^Lot\/Unit$/i,/^Lot\s*No/i,/^Lot$/i,/^Lot\s*\/\s*Block$/i);
+  const kBuilder = findCol(rec,/^Builder$/i);
+  const kAddr1 = findCol(rec,/^Address$/i,/^Address\s*1$/i,/^Job\s*Address$/i,/^Street$/i,/^Street\s*Address$/i,/^Property\s*Address$/i);
+  const kAddr2 = findCol(rec,/^Address\s*2$/i,/^Unit$/i,/^Suite$/i);
+
+  const addrRaw = normSpace([kAddr1?rec[kAddr1]:"", kAddr2?rec[kAddr2]:""].filter(Boolean).join(" "));
+  const addrCol = kAddr1 || "Address";
+  return {
+    subdivision84: String(kSub?rec[kSub]:"").trim(),
+    lot84: String(kLot?rec[kLot]:"").trim(),
+    builder84: String(kBuilder?rec[kBuilder]:"").trim(),
+    address84: addrRaw,
+    address84Key: canonAddress(addrRaw),
+    address84KeyShort: canonAddressShort(addrRaw),
+    addressColName: addrCol,
+    __orig: rec
+  };
+}
+
+/* ======================= CSV parsing ======================= */
+function detectHeaderRow(rows){
+  for(let i=0;i<Math.min(rows.length, 200);i++){
+    const row = rows[i].map(c=>String(c||"").trim());
+    const hasSub = row.some(c=>/^Subdivision$/i.test(c)||/^Community$/i.test(c)||/^Neighborhood$/i.test(c)||/^Subdivision\s*Name$/i.test(c)||/^Project$/i.test(c));
+    const hasTask= row.some(c=>/^Task$/i.test(c)||/^Description$/i.test(c));
+    const hasDate= row.some(c=>/^Start\s*Date$/i.test(c)||/^Scheduled\s*Start$/i.test(c)||/^Schedule\s*Date$/i.test(c)||/^Date$/i.test(c)||/^Start$/i.test(c)||/^Scheduled$/i.test(c));
+    if(hasSub && hasTask && hasDate) return i;
+  }
+  return -1;
+}
+async function parseStartsCsv(file, hint){
+  if(!file) return [];
+  const name = file.name || "file.csv";
+  log("Reading: "+name,"muted");
+  const text = await file.text();
+  let parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  let rows = parsed.data;
+
+  let realHint = hint;
+  if(hint === "VENDOR SUITE"){
+    realHint = { source: "VENDOR SUITE", vendorLabel: vendorLabelFromFilename(name) };
+  }
+
+  if(hint==="ASHTON PORTAL"){
+    const norm = rows.map(r=> normalizeStartsRow(r, "ASHTON PORTAL")).filter(Boolean);
+    log(`Loaded ${norm.length} rows from Ashton Portal`,"ok");
+    return norm;
+  }
+
+  let test = normalizeStartsRow(rows[0]||{}, realHint);
+  if(!test){
+    const raw = Papa.parse(text, {header:false, skipEmptyLines:true}).data;
+    const hdrIdx = detectHeaderRow(raw);
+    if(hdrIdx>=0){
+      const headers = raw[hdrIdx].map(s=>String(s||"").trim());
+      rows = raw.slice(hdrIdx+1).map(r=>{ const o={}; for(let i=0;i<headers.length;i++){ o[headers[i]]=r[i]; } return o; });
+      log("Detected header at row "+hdrIdx+" ("+name+")","ok");
+    }else{
+      log("Could not detect usable header in "+name,"warn");
+      return [];
+    }
+    test = normalizeStartsRow(rows[0]||{}, realHint);
+    if(!test){ log("Header normalization failed for "+name,"warn"); }
+  }
+
+  const norm = rows.map(r=> normalizeStartsRow(r, realHint)).filter(Boolean);
+  log(`Loaded ${norm.length} rows from ${name}`,"ok");
+  return norm;
+}
+async function parse84Csv(file){
+  if(!file) return [];
+  log("Reading 84SALES: "+file.name,"muted");
+  const text = await file.text();
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  const data = parsed.data || [];
+  HEADERS_84 = (parsed.meta && parsed.meta.fields && parsed.meta.fields.length) ? parsed.meta.fields.slice() : Object.keys(data[0]||{});
+  const norm = data.map(normalize84Row);
+  PRIMARY_ADDR_COL_84 = norm.find(r=>r.addressColName)?.addressColName || "Address";
+  log(`Loaded ${norm.length} 84SALES rows`,"ok");
+  return norm;
+}
+
+/* ======================= Categorization & filters ======================= */
+function taskCategory(task){
+  const s = lc(task);
+  if(/screen/.test(s)) return 'screens';
+  if(/drywall/.test(s)) return 'drywall';
+  if(/deliver/.test(s) && /window/.test(s)) return 'delivery';
+  if(/install/.test(s) && /window/.test(s)) return 'windows';
+  return 'other';
+}
+function getTaskFilterOptsFromUI(){
+  return {
+    deliveries: document.getElementById('includeDeliveries').checked,
+    screens: document.getElementById('includeScreens').checked,
+    onlyScreens: document.getElementById('onlyScreens').checked,
+    onlyDrywall: document.getElementById('onlyDrywall').checked
+  };
+}
+function isTaskSelected(task, opts){
+  const cat = taskCategory(task);
+  const only = [];
+  if(opts.onlyScreens) only.push('screens');
+  if(opts.onlyDrywall) only.push('drywall');
+  if(only.length) return only.includes(cat);
+  return (cat === 'windows' || cat === 'drywall' ||
+         (opts.screens && cat === 'screens') ||
+         (opts.deliveries && cat === 'delivery'));
+}
+
+/* ======================= Grouping, dedupe ======================= */
+function withinRange(d, from, to){
+  if(!d) return false;
+  if(from && d < from) return false;
+  if(to && d > to) return false;
+  return true;
+}
+function groupBySubdivision(rows){
+  const map = new Map();
+  rows.forEach(r=>{
+    const k = (r.subdivision||"").trim();
+    if(!k) return;
+    if(!map.has(k)) map.set(k, []);
+    map.get(k).push(r);
+  });
+  return map;
+}
+function dedupeRows(rows){
+  const seen = new Set();
+  const out = [];
+  rows.forEach(r=>{
+    const key = [lc(r.subdivision), normLot(r.lot), r.taskKey, fmtISO(r.date), r.source].join('|');
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push(r);
+  });
+  return out;
+}
+function buildStartsMaps(rows){
+  const byAddr = new Map();
+  const byAddrShort = new Map();
+  const bySubLot = new Map();
+
+  rows.forEach(r=>{
+    if(r.addressKey){
+      if(!byAddr.has(r.addressKey)) byAddr.set(r.addressKey, []);
+      byAddr.get(r.addressKey).push(r);
+    }
+    if(r.addressKeyShort){
+      if(!byAddrShort.has(r.addressKeyShort)) byAddrShort.set(r.addressKeyShort, []);
+      byAddrShort.get(r.addressKeyShort).push(r);
+    }
+    const sk = (String(r.subdivision).toLowerCase().trim() + "||" + String(r.lot).toLowerCase().trim());
+    if(!bySubLot.has(sk)) bySubLot.set(sk, []);
+    bySubLot.get(sk).push(r);
+  });
+
+  for(const arr of byAddr.values()){ arr.sort((a,b)=> (a.date-b.date) || a.address.localeCompare(b.address)); }
+  for(const arr of byAddrShort.values()){ arr.sort((a,b)=> (a.date-b.date) || a.address.localeCompare(b.address)); }
+  for(const arr of bySubLot.values()){ arr.sort((a,b)=> (a.date-b.date) || a.address.localeCompare(b.address)); }
+  return { byAddr, byAddrShort, bySubLot };
+}
+
+/* ======================= Persistence ======================= */
+const LS_KEYS = {
+  EVENTS: 'starts_store_v1',
+  COMPLETED: 'starts_completed_v1',
+  CHANGELOG: 'starts_changelog_v1',
+  NOTES: 'starts_notes_v1',
+  COLORBY: 'starts_colorby_v1',
+  SOURCES: 'starts_source_toggles_v1',
+  MISSING: 'starts_missing_v1',
+  ATTACH: 'starts_attach_v1',
+  SEEN_CHANGES_AT: 'starts_seen_changes_at_v1',
+  UNCOMPLETE_REASONS: 'starts_uncomplete_reasons_v1',
+  WS_ID: 'starts_ws_id'
+};
+function loadJSON(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch{ return fallback; } }
+function saveJSON(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+function loadStore(){ return loadJSON(LS_KEYS.EVENTS, {}); }
+function saveStore(store){ saveJSON(LS_KEYS.EVENTS, store); }
+function loadCompleted(){ return loadJSON(LS_KEYS.COMPLETED, {}); }
+function saveCompleted(map){ saveJSON(LS_KEYS.COMPLETED, map); }
+function loadChangelog(){ return loadJSON(LS_KEYS.CHANGELOG, []); }
+function saveChangelog(arr){ saveJSON(LS_KEYS.CHANGELOG, arr); }
+function loadNotes(){ return loadJSON(LS_KEYS.NOTES, {}); }
+function saveNotes(m){ saveJSON(LS_KEYS.NOTES, m); }
+function loadMissing(){ return loadJSON(LS_KEYS.MISSING, {}); }
+function saveMissing(m){ saveJSON(LS_KEYS.MISSING, m); }
+function loadAttach(){ return loadJSON(LS_KEYS.ATTACH, {}); }
+function saveAttach(m){ saveJSON(LS_KEYS.ATTACH, m); }
+function loadUncompleteReasons(){ return loadJSON(LS_KEYS.UNCOMPLETE_REASONS, {}); }
+function saveUncompleteReasons(m){ saveJSON(LS_KEYS.UNCOMPLETE_REASONS, m); }
+
+function makeJobIdFromRow(r){
+  const parts = [ lc(r.subdivision||""), normLot(r.lot||""), r.taskKey || taskKey(r.task||""), r.addressKey || r.addressKeyShort || "" ];
+  return parts.join('|');
+}
+function makeJobIdFromStoreItem(it){
+  const parts = [ lc(it.subdivision||""), normLot(it.lot||""), it.taskKey||taskKey(it.task||""), it.addressKey||"" ];
+  return parts.join('|');
+}
+
+/* store migration */
+function migrateStoreKeys(){
+  const store = loadStore();
+  const changelog = loadChangelog();
+  const newStore = {};
+  const idMap = {};
+  let migrated = 0, merged = 0;
+
+  for(const oldId in store){
+    const it = store[oldId];
+    const newId = [ lc(it.subdivision||""), normLot(it.lot||""), taskKey(it.task||""), it.addressKey||"" ].join('|');
+    if(!newStore[newId]) newStore[newId] = {...it};
+    else{
+      merged++;
+      const a = newStore[newId], b = it;
+      const keep = (new Date(a.updatedAt||a.createdAt||0) >= new Date(b.updatedAt||b.createdAt||0)) ? a : b;
+      newStore[newId] = {...keep};
+    }
+    if(newId !== oldId){ idMap[oldId] = newId; migrated++; }
+  }
+  if(Object.keys(idMap).length){
+    changelog.forEach(e=>{ if(idMap[e.id]) e.id = idMap[e.id]; });
+  }
+  saveStore(newStore);
+  saveChangelog(changelog);
+  if(migrated) log(`Store migration: re-keyed ${migrated} item(s), merged ${merged} duplicate(s).`, "ok");
+}
+
+function mergeIntoStore(rows){
+  const store = loadStore();
+  const changelog = loadChangelog();
+  let added=0, updated=0;
+  rows.forEach(r=>{
+    const id = makeJobIdFromRow(r);
+    const d = fmtISO(r.date);
+    if(!id || !d) return;
+    const existing = store[id];
+    if(!existing){
+      store[id] = {
+        subdivision: r.subdivision, lot: r.lot, taskKey: r.taskKey, task: r.task,
+        builder: r.builder, address: r.address, addressKey: r.addressKey,
+        source: r.source, date: d, createdAt: nowISO(), updatedAt: nowISO()
+      };
+      added++;
+    }else{
+      if(existing.date !== d){
+        changelog.push({ id, from: existing.date, to: d, changedAt: nowISO(), snapshot: {...existing} });
+        existing.date = d;
+        existing.updatedAt = nowISO();
+        updated++;
+      }
+      existing.subdivision = r.subdivision || existing.subdivision;
+      existing.lot = r.lot || existing.lot;
+      existing.task = r.task || existing.task;
+      existing.taskKey = r.taskKey || existing.taskKey;
+      existing.builder = r.builder || existing.builder;
+      existing.address = r.address || existing.address;
+      existing.addressKey = r.addressKey || existing.addressKey;
+      existing.source = r.source || existing.source;
+    }
+  });
+  saveStore(store);
+  saveChangelog(changelog);
+  if(added||updated) log(`Store merged — added ${added}, updated ${updated}.`, "ok");
+}
+
+/* helpers for completed flag */
+function isCompleted(id){ const c = loadCompleted(); return !!c[id]; }
+function setCompleted(id, val){ const c = loadCompleted(); if(val) c[id]=true; else delete c[id]; saveCompleted(c); }
+
+/* History access */
+function getHistoryForId(id){
+  const logArr = loadChangelog();
+  return logArr.filter(e=>e.id===id).sort((a,b)=> new Date(a.changedAt)-new Date(b.changedAt));
+}
+function lastMoveDirection(id){
+  const h = getHistoryForId(id);
+  if(!h.length) return null;
+  let dir = null;
+  const last = h[h.length-1];
+  const a = parseDate(last.from), b = parseDate(last.to);
+  if(a && b){
+    if(b < a) dir = 'forward';
+    else if(b > a) dir = 'back';
+  }
+  const hasF = h.some(x=> parseDate(x.to) < parseDate(x.from));
+  const hasB = h.some(x=> parseDate(x.to) > parseDate(x.from));
+  if(hasF && hasB) return 'mixed';
+  return dir || 'mixed';
+}
+
+/* ======================= Render chips & results ======================= */
+function renderChips(group){
+  const wrap = document.getElementById('chips'); wrap.innerHTML="";
+  const subs = Array.from(group.keys()).sort((a,b)=>a.localeCompare(b));
+  if(!subs.length){ wrap.innerHTML = '<span class="muted">No matching rows in range.</span>'; return; }
+  subs.forEach(name=>{
+    const arr = group.get(name) || [];
+    const chip = document.createElement('div');
+    chip.className='chip';
+    chip.dataset.sub=name;
+    chip.innerHTML = `<span>${name}</span> <span class="count">${arr.length}</span>`;
+    chip.addEventListener('click', ()=>{
+      toggleSubFilter(name, {jump:true});
+      scrollToSub(name);
+    });
+    wrap.appendChild(chip);
+  });
+  updateChipSelectionStyles();
+}
+function renderResults(group){
+  const out = document.getElementById('results'); out.innerHTML="";
+  const subs = Array.from(group.keys()).sort((a,b)=>a.localeCompare(b));
+  subs.forEach(name=>{
+    const arr = group.get(name).slice().sort((a,b)=> (a.date-b.date) || (a.lot||"").localeCompare(b.lot||""));
+    const det = document.createElement('details'); det.className='joblist'; det.open=false;
+    const id = "sub-"+btoa(unescape(encodeURIComponent(name))).replace(/=+$/,'');
+    det.id = id;
+
+    const total = arr.length;
+    const soon = arr.slice(0,3).map(r=> fmtISO(r.date)).join(", ");
+    det.innerHTML = `<summary>${name} <span class="pill">${total} jobs</span> <span class="pill">next: ${soon||'—'}</span></summary>`;
+
+    const tbl = document.createElement('table');
+    const thead = document.createElement('thead'); 
+    thead.innerHTML = '<tr><th>Start</th><th>Lot/Block</th><th>Address</th><th>Task</th><th>Builder</th><th>Source</th></tr>';
+    const tbody = document.createElement('tbody');
+    arr.forEach(r=>{
+      const rowId = makeJobIdFromRow(r);
+      const tr = document.createElement('tr');
+      if(isCompleted(rowId)) tr.classList.add('completed');
+      tr.innerHTML = `<td>${fmtISO(r.date)}</td><td>${r.lot||""}</td><td>${r.address||""}</td><td>${r.task}</td><td>${r.builder||""}</td><td>${r.source||""}</td>`;
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(thead); tbl.appendChild(tbody);
+    det.appendChild(tbl);
+    out.appendChild(det);
+  });
+}
+function scrollToSub(name){
+  const id = "sub-"+btoa(unescape(encodeURIComponent(name))).replace(/=+$/,'');
+  const el = document.getElementById(id);
+  if(el){ el.open = true; el.scrollIntoView({behavior:'smooth', block:'start'}); }
+}
+
+/* ======================= Exports ======================= */
+function exportStartsCSV(rows){
+  if(!rows.length){ alert("No rows to export."); return; }
+  const headers = ["Subdivision","Lot / Block","Address","Task","Start Date","Builder","Source"];
+  const csv = [headers].concat(rows.map(r=>[r.subdivision, r.lot||"", r.address||"", r.task, fmtISO(r.date), r.builder||"", r.source||""]))
+    .map(r=>r.map(x=>('"'+String(x??"").replace(/"/g,'""')+'"')).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download="starts_filtered.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function export84Matches(startRows, rows84){
+  if(!rows84.length){ alert("Load 84SALES first."); return; }
+  if(!startRows.length){ alert("No filtered Starts rows to match."); return; }
+  const { byAddr, byAddrShort, bySubLot } = buildStartsMaps(startRows);
+  const headers = (HEADERS_84 && HEADERS_84.length) ? HEADERS_84.slice() : Object.keys(rows84[0].__orig||{});
+  const addrCol = PRIMARY_ADDR_COL_84 || "Address";
+  const theExtra = "Start Date (Starts)";
+  const outHeaders = headers.includes(theExtra) ? headers : headers.concat([theExtra]);
+
+  const outRows = [];
+  let matched=0;
+  rows84.forEach(r84=>{
+    let match=null;
+    if(r84.address84Key && byAddr.has(r84.address84Key)) match = byAddr.get(r84.address84Key)[0];
+    if(!match && r84.address84KeyShort && byAddrShort.has(r84.address84KeyShort)) match = byAddrShort.get(r84.address84KeyShort)[0];
+    if(!match){
+      const sk = (String(r84.subdivision84||"").toLowerCase().trim() + "||" + String(r84.lot84||"").toLowerCase().trim());
+      if(bySubLot.has(sk)) match = bySubLot.get(sk)[0];
+    }
+    if(!match) return;
+    const rowObj = Object.assign({}, r84.__orig);
+    rowObj[addrCol] = match.address || rowObj[addrCol];
+    rowObj[theExtra] = fmtISO(match.date);
+    outRows.push(outHeaders.map(h=> rowObj[h] ?? ""));
+    matched++;
+  });
+  if(!matched){ alert("No 84SALES rows matched the filtered Starts."); return; }
+  const csv = [outHeaders].concat(outRows).map(r=> r.map(x=>('"'+String(x??"").replace(/"/g,'""')+'"')).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download="84sales_with_starts.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function exportListScheduleCSV(){
+  const events = getEventsForCalendar().slice().sort((a,b)=>{
+    if(a.start < b.start) return -1;
+    if(a.start > b.start) return 1;
+    const as = (a.extendedProps.subdivision||"").localeCompare(b.extendedProps.subdivision||"");
+    if(as) return as;
+    return (a.extendedProps.lot||"").localeCompare(b.extendedProps.lot||"");
+  });
+  if(!events.length){ alert("No events to export for the current list schedule."); return; }
+  const headers = ["Date","Subdivision","Lot/Block","Task","Builder","Address","Source","Completed","Unresolved Missing","Moves Count","Last Move Dir"];
+  const rows = events.map(e=>{
+    const p = e.extendedProps || {};
+    return [e.start, p.subdivision||"", p.lot||"", p.task||"", p.builder||"", p.address||"", p.source||"", p.completed ? "Yes" : "No", p.missingUnresolved||0, p.movedCount||0, p.movedDir||""];
+  });
+  const csv = [headers].concat(rows).map(r=> r.map(x=>('"'+String(x??"").replace(/"/g,'""')+'"')).join(",")).join("\n");
+  const from = document.getElementById('dFrom').value || "";
+  const to = document.getElementById('dTo').value || "";
+  const fname = `list_schedule_${from||'from'}_${to||'to'}.csv`;
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+/* ======================= Run flow ======================= */
+let STARTS_ROWS_ALL = [];
+let STARTS_ROWS_VIEW = [];
+let ROWS_84 = [];
+let _calendarInstance = null;
+const CURRENT_SUB_FILTERS = new Set();
+
+function sourceToggles(){
+  const saved = loadJSON(LS_KEYS.SOURCES, {BWP:true, SUPPLYPRO:true, "VENDOR SUITE":true, "ASHTON PORTAL":true});
+  const BWP = document.getElementById('srcBWP').checked;
+  const SP  = document.getElementById('srcSP').checked;
+  const V   = document.getElementById('srcVEND').checked;
+  const A   = document.getElementById('srcASHTON').checked;
+  const cur = {BWP, SUPPLYPRO:SP, "VENDOR SUITE":V, "ASHTON PORTAL":A};
+  if(JSON.stringify(saved)!==JSON.stringify(cur)) saveJSON(LS_KEYS.SOURCES, cur);
+  return cur;
+}
+
+async function run(){
+  try{
+    statusEl.innerHTML="";
+    const fBwp = document.getElementById('bwp').files[0] || null;
+    const fSp  = document.getElementById('sp').files[0] || null;
+    const fVendList = Array.from(document.getElementById('vendor').files || []);
+    const fAshton = document.getElementById('ashton').files[0] || null;
+
+    if(!fBwp && !fSp && fVendList.length===0 && !fAshton){ log("Choose at least one Starts CSV (BWP / SupplyPro / Vendor Suite / Ashton).","warn"); }
+
+    const opts = getTaskFilterOptsFromUI();
+
+    const rowsA = fBwp ? await parseStartsCsv(fBwp, "BWP") : [];
+    const rowsB = fSp  ? await parseStartsCsv(fSp,  "SUPPLYPRO")  : [];
+    const rowsAshton = fAshton ? await parseStartsCsv(fAshton, "ASHTON PORTAL") : [];
+    let rowsV = [];
+    if(fVendList.length){
+      for(const f of fVendList){
+        const r = await parseStartsCsv(f, "VENDOR SUITE");
+        rowsV = rowsV.concat(r);
+      }
+      log(`Vendor Suite total rows: ${rowsV.length}`,"ok");
+    }
+    STARTS_ROWS_ALL = rowsA.concat(rowsB).concat(rowsV).concat(rowsAshton);
+
+    const rowsSelected = STARTS_ROWS_ALL.filter(r=> isTaskSelected(r.task, opts));
+    mergeIntoStore(dedupeRows(rowsSelected));
+
+    migrateStoreKeys();
+
+    const dFrom = parseDate(document.getElementById('dFrom').value);
+    const dTo   = parseDate(document.getElementById('dTo').value);
+    let rows = rowsSelected.filter(r=> withinRange(r.date, dFrom, dTo));
+    const before = rows.length;
+    rows = dedupeRows(rows);
+    const removed = before - rows.length;
+    STARTS_ROWS_VIEW = rows;
+
+    attentionBanner();
+
+    log(`After filters: ${rows.length} rows` , rows.length ? "ok" : "warn");
+    if(removed>0) log(`Removed duplicates: ${removed}`, "muted");
+
+    const group = groupBySubdivision(rows);
+    renderChips(group);
+    renderResults(group);
+    populateSubdatalist();
+    rebuildCalendar();
+
+    // schedule push of the freshly merged state to cloud (if connected)
+    AzureSync.schedulePush?.();
+  }catch(e){
+    log("Run failed: "+e.message, "warn");
+  }
+}
+
+/* ======================= Color + legend ======================= */
+const SOURCE_COLORS = {
+  "BWP": getCSS('--bwp') || '#7c4dff',
+  "SUPPLYPRO": getCSS('--sp') || '#00b3b8',
+  "VENDOR SUITE": getCSS('--vend') || '#ff8a00',
+  "ASHTON PORTAL": getCSS('--ashton') || '#e91e63'
+};
+function getCSS(varName){ return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
+function hashToHsl(str){ let h=0; for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i))>>>0; } const hue = h % 360; return `hsl(${hue} 70% 45%)`; }
+function getColorBy(){ return (document.querySelector('input[name="colorby"]:checked')?.value)||'source'; }
+function pickColor(key, by){
+  if(by==='source' && SOURCE_COLORS[key]) return SOURCE_COLORS[key];
+  return hashToHsl(key||'Other');
+}
+function getColorKeyForEvent(ev){ const p = ev.extendedProps||{}; return getColorBy()==='builder' ? (p.builder||'Other') : (p.source||'Other'); }
+function renderLegend(events){
+  const box = document.getElementById('legend'); box.innerHTML="";
+  const by = getColorBy();
+  const keys = new Map();
+  for(const ev of events){ const k = getColorKeyForEvent(ev); if(!k) continue; keys.set(k, (keys.get(k)||0)+1); }
+  const items = Array.from(keys.entries()).sort((a,b)=> b[1]-a[1]).slice(0,20);
+  items.forEach(([k,count])=>{
+    const sw = document.createElement('span'); sw.className='sw'; sw.style.background = pickColor(k, by);
+    const it = document.createElement('span'); it.className='key';
+    it.appendChild(sw);
+    it.appendChild(document.createTextNode(`${k} (${count})`));
+    box.appendChild(it);
+  });
+  if(!items.length){ const m=document.createElement('span'); m.className='muted'; m.textContent='No events'; box.appendChild(m); }
+}
+
+/* ======================= Calendar ======================= */
+function getMissingInfo(id){
+  const m = loadMissing()[id] || [];
+  const unresolved = m.filter(x=>!x.done).length;
+  return {items:m, unresolved};
+}
+function getEventsForCalendar(){
+  const includeStored = document.getElementById('includeStored').checked;
+  const hideCompleted = document.getElementById('hideCompleted').checked;
+  const from = parseDate(document.getElementById('dFrom').value);
+  const to   = parseDate(document.getElementById('dTo').value);
+  const srcOn = sourceToggles();
+  const taskOpts = getTaskFilterOptsFromUI();
+
+  const wantAll = CURRENT_SUB_FILTERS.size === 0;
+  const wantSub = (sub) => wantAll || CURRENT_SUB_FILTERS.has(lc(normSpace(sub||"")));
+
+  const events = [];
+  const pushEvent = (id, pDate, payload) => {
+    if(!srcOn[payload.source||""]) return;
+    const miss = getMissingInfo(id);
+    const classNames = [];
+    if(isCompleted(id)) classNames.push('completed');
+    if(miss.unresolved>0 && !isCompleted(id)) classNames.push('has-missing');
+
+    const hist = getHistoryForId(id);
+    const movedDir = lastMoveDirection(id);
+    const movedCount = hist.length;
+
+    events.push({
+      id,
+      title: `${payload.subdivision}${payload.lot?` Lot ${payload.lot}`:""}: ${payload.task}`,
+      start: pDate,
+      allDay: true,
+      classNames,
+      extendedProps: {
+        builder: payload.builder||"",
+        subdivision: payload.subdivision||"",
+        lot: payload.lot||"",
+        address: payload.address||"",
+        task: payload.task||"",
+        source: payload.source || "",
+        completed: isCompleted(id),
+        missingUnresolved: miss.unresolved,
+        movedCount, movedDir
+      }
+    });
+  };
+
+  if(includeStored){
+    const store = loadStore();
+    for(const id in store){
+      const it = store[id];
+      const d = parseDate(it.date);
+      if(!withinRange(d, from, to)) continue;
+      if(!wantSub(it.subdivision)) continue;
+      if(hideCompleted && isCompleted(id)) continue;
+      if(!isTaskSelected(it.task, taskOpts)) continue;
+      pushEvent(id, it.date, it);
+    }
+  } else {
+    for(const r of STARTS_ROWS_VIEW){
+      const id = makeJobIdFromRow(r);
+      if(!wantSub(r.subdivision)) continue;
+      if(hideCompleted && isCompleted(id)) continue;
+      if(!isTaskSelected(r.task, taskOpts)) continue;
+      pushEvent(id, fmtISO(r.date), r);
+    }
+  }
+
+  // exact id+date
+  const seen = new Set(); const step1 = [];
+  for(const e of events){ const k = e.id + "|" + e.start; if(seen.has(k)) continue; seen.add(k); step1.push(e); }
+  // collapse by lot/date/source/category
+  const seen2 = new Set(); const deduped = [];
+  for(const e of step1){
+    const p = e.extendedProps||{};
+    const cat = taskCategory(p.task||"");
+    const k2 = [lc(p.subdivision||""), normLot(p.lot||""), e.start, p.source||"", cat].join('|');
+    if(seen2.has(k2)) continue;
+    seen2.add(k2);
+    deduped.push(e);
+  }
+
+  log(`Calendar events prepared: ${deduped.length}`, deduped.length?'ok':'warn');
+  return deduped;
+}
+function rebuildCalendar(){
+  const events = getEventsForCalendar();
+  renderCalendar(events);
+  renderLegend(events);
+}
+
+let _currentDrawer = null;
+function renderCalendar(events){
+  const calEl = document.getElementById('calendar');
+  if(!window.FullCalendar || !window.FullCalendar.Calendar){
+    calEl.innerHTML = '<div class="muted">Calendar library failed to load.</div>';
+    log("Calendar library not loaded.", "warn");
+    return;
+  }
+  if(_calendarInstance){ _calendarInstance.destroy(); _calendarInstance = null; }
+  calEl.innerHTML = "";
+  const earliest = events.length ? events.map(e=>e.start).sort()[0] : null;
+
+  _calendarInstance = new FullCalendar.Calendar(calEl, {
+    initialView: 'dayGridMonth',
+    height: 650,
+    headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,listWeek' },
+    displayEventTime: false,
+    ...(earliest ? { initialDate: earliest } : {}),
+    events,
+
+    eventContent: (arg) => {
+      const e = arg.event; const p = e.extendedProps || {};
+      if (arg.view.type.startsWith('list')) {
+        const row = document.createElement('div');
+        row.textContent = `${fmtLong(e.start)} — ${p.subdivision}${p.lot?` Lot ${p.lot}`:""}: ${p.task}`;
+        return { domNodes: [row] };
+      } else if (arg.view.type === 'dayGridMonth') {
+        const wrap = document.createElement('div');
+        wrap.className = 'evt-text';
+        wrap.textContent = `${p.subdivision}${p.lot?` Lot ${p.lot}`:""}: ${p.task}`;
+        return { domNodes: [wrap] };
+      }
+      return;
+    },
+
+    eventDidMount: (info) => {
+      const p = info.event.extendedProps || {};
+      const lines = [
+        `Date: ${fmtLong(info.event.start)}`,
+        p.builder && `Builder: ${p.builder}`,
+        p.subdivision && `Subdivision: ${p.subdivision}`,
+        p.lot && `Lot: ${p.lot}`,
+        p.address && `Address: ${p.address}`,
+        p.task && `Task: ${p.task}`,
+        p.source && `Source: ${p.source}`,
+        (p.missingUnresolved>0) && `Missing items: ${p.missingUnresolved}`,
+        (p.movedCount>0) && `Date changes: ${p.movedCount} (last: ${p.movedDir})`,
+        p.completed ? 'Status: Completed' : ''
+      ].filter(Boolean);
+      info.el.title = lines.join('\n');
+
+      const key = getColorKeyForEvent(info.event);
+      const color = pickColor(key, getColorBy());
+      info.el.style.backgroundColor = color;
+      info.el.style.borderColor = color;
+      const dot = info.el.querySelector('.fc-list-event-dot'); if(dot) dot.style.borderColor = color;
+
+      if(p.movedCount>0){
+        const b = document.createElement('span');
+        b.className = 'moved-badge ' + (p.movedDir||'mixed');
+        b.textContent = (p.movedDir==='forward'?'↑ moved': (p.movedDir==='back'?'↓ moved':'↔ moved'));
+        info.el.style.position = 'relative';
+        info.el.appendChild(b);
+      }
+    },
+
+    eventClick: (info) => openDrawer(info.event)
+  });
+  _calendarInstance.render();
+
+  if(!events.length){
+    const note = document.createElement('div');
+    note.className = "muted";
+    note.style.marginTop = "8px";
+    note.textContent = "No dated rows in the current filter range.";
+    calEl.appendChild(note);
+  }
+}
+function gotoDate(iso){ if(_calendarInstance && iso){ _calendarInstance.gotoDate(iso); } }
+
+/* ======================= Drawer etc. ======================= */
+function renderHistoryList(id){
+  const box = document.getElementById('dHistory'); box.innerHTML="";
+  const hist = getHistoryForId(id);
+  if(!hist.length){ box.innerHTML = '<div class="mini muted">No date changes for this job.</div>'; }
+  else{
+    hist.forEach(h=>{
+      const a = parseDate(h.from), b = parseDate(h.to);
+      const dir = (a && b) ? (b<a ? 'pulled forward' : (b>a ? 'pushed back' : 'same day')) : '';
+      const line = document.createElement('div');
+      line.textContent = `${fmtISO(a)} → ${fmtISO(b)} (${dir}) at ${fmtLocalTS(h.changedAt)}`;
+      box.appendChild(line);
+    });
+  }
+  const reasons = loadUncompleteReasons();
+  const rec = reasons[id];
+  if(rec && rec.reason){
+    const sep = document.createElement('div'); sep.style.marginTop='6px'; sep.style.borderTop='1px dashed #2a3346'; sep.style.paddingTop='6px';
+    const hdr = document.createElement('div'); hdr.style.fontWeight='600'; hdr.style.marginBottom='2px'; hdr.textContent = 'Status changes';
+    const l = document.createElement('div'); l.textContent = `UNCOMPLETED at ${fmtLocalTS(rec.at)} — ${rec.reason}`;
+    sep.appendChild(hdr); sep.appendChild(l); box.appendChild(sep);
+  }
+}
+
+function openDrawer(event){
+  _currentDrawer = event;
+  const p = event.extendedProps || {};
+  document.getElementById('drawerTitle').textContent = `${p.subdivision}${p.lot?` — Lot ${p.lot}`:""}`;
+  document.getElementById('dDate').textContent = fmtLong(event.start);
+  document.getElementById('dSub').textContent = p.subdivision || '';
+  document.getElementById('dLot').textContent = p.lot || '';
+  document.getElementById('dTask').textContent = p.task || '';
+  document.getElementById('dBuilder').textContent = p.builder || '';
+  document.getElementById('dAddress').textContent = p.address || '';
+  document.getElementById('dSource').textContent = p.source || '';
+  document.getElementById('dCompleted').checked = !!p.completed;
+
+  const notes = loadNotes();
+  document.getElementById('dNotes').value = notes[event.id] || '';
+
+  renderMissingList(event.id);
+  renderAttachList(event.id);
+  renderHistoryList(event.id);
+
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer(){ document.getElementById('drawer').classList.remove('open'); _currentDrawer=null; }
+document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+document.getElementById('drawerSave').addEventListener('click', ()=>{
+  if(!_currentDrawer) return;
+  const id = _currentDrawer.id;
+  const wantCompleted = document.getElementById('dCompleted').checked;
+  const prev = isCompleted(id);
+  if(prev !== wantCompleted){
+    if(prev && !wantCompleted){
+      const reason = prompt("Provide a reason for marking this job NOT completed:");
+      if(!reason || !reason.trim()){
+        document.getElementById('dCompleted').checked = true;
+        return;
+      }
+      const reasons = loadUncompleteReasons(); reasons[id] = {reason:reason.trim(), at:nowISO()}; saveUncompleteReasons(reasons);
+      renderHistoryList(id);
+    }
+    setCompleted(id, wantCompleted);
+    const classes = new Set(_currentDrawer.classNames);
+    if(wantCompleted) classes.add('completed'); else classes.delete('completed');
+    _currentDrawer.setProp('classNames', Array.from(classes));
+    if(document.getElementById('hideCompleted').checked){ rebuildCalendar(); }
+    AzureSync.schedulePush?.();
+  }
+  const notes = loadNotes();
+  notes[id] = document.getElementById('dNotes').value;
+  saveNotes(notes);
+  AzureSync.schedulePush?.();
+  closeDrawer();
+});
+
+/* Missing items */
+function renderMissingList(id){
+  const list = document.getElementById('miList'); list.innerHTML="";
+  const m = loadMissing(); const items = m[id]||[];
+  if(!items.length){ list.innerHTML = '<div class="mini muted">No missing items for this job.</div>'; return; }
+  items.forEach((it, idx)=>{
+    const row = document.createElement('div'); row.className='mi-item';
+    const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.done;
+    cb.addEventListener('change', ()=>{
+      const all = loadMissing(); all[id][idx].done = cb.checked; saveMissing(all); rebuildCalendar(); AzureSync.schedulePush?.();
+    });
+    const txt = document.createElement('span'); txt.textContent = it.text;
+    const rm = document.createElement('button'); rm.className='btn'; rm.textContent='Remove';
+    rm.addEventListener('click', ()=>{
+      const all = loadMissing(); all[id].splice(idx,1); saveMissing(all); renderMissingList(id); rebuildCalendar(); AzureSync.schedulePush?.();
+    });
+    row.append(cb, txt, rm); list.appendChild(row);
+  });
+}
+document.getElementById('miAdd').addEventListener('click', ()=>{
+  if(!_currentDrawer) return;
+  const id = _currentDrawer.id;
+  const val = normSpace(document.getElementById('miText').value);
+  if(!val) return;
+  const all = loadMissing(); if(!all[id]) all[id]=[];
+  all[id].push({ text: val, done:false, addedAt:nowISO() }); saveMissing(all);
+  document.getElementById('miText').value=""; renderMissingList(id); rebuildCalendar(); AzureSync.schedulePush?.();
+});
+document.getElementById('miMarkAll').addEventListener('click', ()=>{
+  if(!_currentDrawer) return; const id=_currentDrawer.id;
+  const all = loadMissing(); if(!all[id]) return;
+  all[id].forEach(x=>x.done=true); saveMissing(all); renderMissingList(id); rebuildCalendar(); AzureSync.schedulePush?.();
+});
+
+/* Attachments (DataURLs) */
+function renderAttachList(id){
+  const box = document.getElementById('attList'); box.innerHTML="";
+  const all = loadAttach(); const arr = all[id]||[];
+  if(!arr.length){ box.innerHTML='<div class="mini muted">No attachments.</div>'; return; }
+  arr.forEach((a, idx)=>{
+    const row = document.createElement('div'); row.className='att';
+    const left = document.createElement('div'); left.textContent = `${a.name} (${Math.round((a.size||0)/1024)} KB)`;
+    const right = document.createElement('div');
+    const dl = document.createElement('a'); dl.href=a.data||"#"; dl.download=a.name||"file"; dl.textContent='Open'; dl.className='btn';
+    if(!a.data) dl.style.opacity=.5;
+    const rm = document.createElement('button'); rm.textContent='Remove'; rm.className='btn';
+    rm.addEventListener('click', ()=>{ const all2=loadAttach(); all2[id].splice(idx,1); saveAttach(all2); renderAttachList(id); AzureSync.schedulePush?.(); });
+    right.append(dl, rm); row.append(left, right); box.appendChild(row);
+  });
+}
+document.getElementById('attFile').addEventListener('change', (e)=>{
+  if(!_currentDrawer) return;
+  const id = _currentDrawer.id;
+  const files = Array.from(e.target.files||[]);
+  if(!files.length) return;
+  const all = loadAttach(); if(!all[id]) all[id]=[];
+  const readers = files.map(f => new Promise(res=>{
+    if(f.size > 2*1024*1024){
+      all[id].push({name:f.name, type:f.type, size:f.size, data:null, addedAt:nowISO()}); return res();
+    }
+    const r = new FileReader();
+    r.onload = ()=>{ all[id].push({name:f.name, type:f.type, size:f.size, data:r.result, addedAt:nowISO()}); res(); };
+    r.readAsDataURL(f);
+  }));
+  Promise.all(readers).then(()=>{ saveAttach(all); renderAttachList(id); e.target.value=""; AzureSync.schedulePush?.(); });
+});
+
+/* ======================= Subdivision filters ======================= */
+function collectSubdivisions(){
+  const names = new Set();
+  for(const r of (STARTS_ROWS_VIEW || [])){ if(r && r.subdivision) names.add(String(r.subdivision).trim()); }
+  if(document.getElementById('includeStored')?.checked){
+    const store = loadStore();
+    for(const id in store){ const it = store[id]; if(it && it.subdivision) names.add(String(it.subdivision).trim()); }
+  }
+  return Array.from(names).sort((a,b)=> a.localeCompare(b));
+}
+function populateSubdatalist(){
+  const list = document.getElementById('subList'); if(!list) return;
+  const subs = collectSubdivisions();
+  list.innerHTML = subs.map(n => `<option value="${n}"></option>`).join('');
+}
+function findExactSubdivision(name, names){ const target = (name||"").trim().toLowerCase(); return names.find(n => n.toLowerCase() === target) || null; }
+function updateChipSelectionStyles(){
+  const chips = document.querySelectorAll('#chips .chip');
+  chips.forEach(ch=>{
+    const name = ch.dataset.sub || "";
+    const on = CURRENT_SUB_FILTERS.has(lc(normSpace(name)));
+    ch.classList.toggle('selected', on);
+  });
+}
+function updateSelectedTags(){
+  const wrap = document.getElementById('selectedTags'); wrap.innerHTML = "";
+  if(CURRENT_SUB_FILTERS.size === 0){
+    const m = document.createElement('div'); m.className = 'muted'; m.textContent = 'No calendar subdivision filters — showing all.'; wrap.appendChild(m); return;
+  }
+  const allNames = collectSubdivisions();
+  CURRENT_SUB_FILTERS.forEach(norm=>{
+    const display = allNames.find(n=>lc(n)===norm) || norm;
+    const tag = document.createElement('div'); tag.className = 'tag';
+    tag.innerHTML = `<span>${display}</span><button title="Remove">×</button>`;
+    tag.querySelector('button').addEventListener('click', ()=>{
+      CURRENT_SUB_FILTERS.delete(norm); updateChipSelectionStyles(); updateSelectedTags(); rebuildCalendar();
+    });
+    wrap.appendChild(tag);
+  });
+}
+function addSubFilter(name, {jump=false}={}){
+  const norm = lc(normSpace(name||"")); if(!norm) return;
+  CURRENT_SUB_FILTERS.add(norm); updateChipSelectionStyles(); updateSelectedTags();
+  const evs = getEventsForCalendar(); if(jump){ const earliest = evs.length ? evs.map(e=>e.start).sort()[0] : null; if(earliest) gotoDate(earliest); }
+  renderCalendar(evs); renderLegend(evs);
+}
+function removeSubFilter(name){ const norm = lc(normSpace(name||"")); if(!norm) return; CURRENT_SUB_FILTERS.delete(norm); updateChipSelectionStyles(); updateSelectedTags(); rebuildCalendar(); }
+function toggleSubFilter(name, {jump=false}={}){ const norm = lc(normSpace(name||"")); if(!norm) return; if(CURRENT_SUB_FILTERS.has(norm)) removeSubFilter(name); else addSubFilter(name, {jump}); }
+function clearSubFilters(){ CURRENT_SUB_FILTERS.clear(); updateChipSelectionStyles(); updateSelectedTags(); rebuildCalendar(); }
+function debounce(fn, ms=200){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; }
+
+/* ======================= ICS Export ======================= */
+function pad2(n){ return String(n).padStart(2,'0'); }
+function toICSDate(iso){ const d = parseDate(iso); return d ? `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}` : ""; }
+function dtstampUTC(){ const d = new Date(); return `${d.getUTCFullYear()}${pad2(d.getUTCMonth()+1)}${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`; }
+function escapeICS(s){ return String(s||"").replace(/\\n/g,"\\n").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;"); }
+function exportICS(){
+  const events = getEventsForCalendar(); if(!events.length){ alert("No events to export for .ics"); return; }
+  const lines = []; lines.push("BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Starts Viewer//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH");
+  const stamp = dtstampUTC();
+  for(const e of events){
+    const p = e.extendedProps||{};
+    const uid = (e.id + "|" + e.start).replace(/[^A-Za-z0-9@._-]/g,'') + "@startsviewer";
+    const summary = `${p.subdivision}${p.lot?` Lot ${p.lot}`:""}: ${p.task}`;
+    const desc = [
+      `Subdivision: ${p.subdivision||''}`,
+      `Lot: ${p.lot||''}`,
+      `Builder: ${p.builder||''}`,
+      `Address: ${p.address||''}`,
+      `Source: ${p.source||''}`,
+      `Completed: ${p.completed?'Yes':'No'}`,
+      `Missing items: ${p.missingUnresolved||0}`,
+      `Moves: ${p.movedCount||0} (${p.movedDir||''})`
+    ].join("\\n");
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:${uid}`);
+    lines.push(`DTSTAMP:${stamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${toICSDate(e.start)}`);
+    lines.push(`SUMMARY:${escapeICS(summary)}`);
+    if(p.address) lines.push(`LOCATION:${escapeICS(p.address)}`);
+    lines.push(`DESCRIPTION:${desc}`);
+    const category = getColorKeyForEvent(e); if(category) lines.push(`CATEGORIES:${escapeICS(category)}`);
+    lines.push("END:VEVENT");
+  }
+  lines.push("END:VCALENDAR");
+  const ics = lines.join("\r\n");
+  const blob = new Blob([ics], {type:"text/calendar"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download="starts_schedule.ics"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+/* ======================= Backup / Restore ======================= */
+function exportBackup(){
+  const payload = {
+    version: 2,
+    exportedAt: nowISO(),
+    store: loadStore(),
+    completed: loadCompleted(),
+    changelog: loadChangelog(),
+    notes: loadNotes(),
+    missing: loadMissing(),
+    attachments: loadAttach(),
+    sourceToggles: loadJSON(LS_KEYS.SOURCES, {BWP:true,SUPPLYPRO:true,"VENDOR SUITE":true,"ASHTON PORTAL":true}),
+    colorBy: loadJSON(LS_KEYS.COLORBY, "source"),
+    seenChangesAt: localStorage.getItem(LS_KEYS.SEEN_CHANGES_AT)||null,
+    uncompleteReasons: loadUncompleteReasons()
+  };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download="starts_backup.json"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function importBackup(file){
+  if(!file) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    try{
+      const data = JSON.parse(fr.result);
+      if(!data || typeof data !== 'object') throw new Error("Invalid file");
+      if(data.store) saveStore(data.store);
+      if(data.completed) saveCompleted(data.completed);
+      if(data.changelog) saveChangelog(data.changelog);
+      if(data.notes) saveNotes(data.notes);
+      if(data.missing) saveMissing(data.missing);
+      if(data.attachments) saveAttach(data.attachments);
+      if(data.sourceToggles) saveJSON(LS_KEYS.SOURCES, data.sourceToggles);
+      if(data.colorBy) saveJSON(LS_KEYS.COLORBY, data.colorBy);
+      if(data.seenChangesAt) localStorage.setItem(LS_KEYS.SEEN_CHANGES_AT, data.seenChangesAt);
+      if(data.uncompleteReasons) saveUncompleteReasons(data.uncompleteReasons);
+      log("Backup imported.", "ok");
+      const src = loadJSON(LS_KEYS.SOURCES, {BWP:true,SUPPLYPRO:true,"VENDOR SUITE":true,"ASHTON PORTAL":true});
+      document.getElementById('srcBWP').checked = !!src.BWP;
+      document.getElementById('srcSP').checked  = !!src.SUPPLYPRO;
+      document.getElementById('srcVEND').checked= !!src["VENDOR SUITE"];
+      document.getElementById('srcASHTON').checked= !!src["ASHTON PORTAL"];
+      const by = loadJSON(LS_KEYS.COLORBY, "source");
+      const r = document.querySelector(`input[name="colorby"][value="${by}"]`); if(r) r.checked = true;
+      rebuildCalendar();
+      AzureSync.schedulePush?.();
+    }catch(e){ alert("Import failed: "+e.message); }
+  };
+  fr.readAsText(file);
+}
+
+/* ======================= Attention banner ======================= */
+function attentionBanner(){
+  const banner = document.getElementById('topBanner');
+  const miss = loadMissing();
+  let unresolved = 0, jobs = 0;
+  Object.keys(miss).forEach(id=>{
+    const arr = miss[id]||[]; const c = arr.filter(x=>!x.done).length;
+    if(c>0){ unresolved += c; jobs++; }
+  });
+
+  const seenAt = localStorage.getItem(LS_KEYS.SEEN_CHANGES_AT) || '1970-01-01T00:00:00Z';
+  const newChanges = loadChangelog().filter(x=> x.changedAt > seenAt);
+  const pulled = newChanges.filter(x=> parseDate(x.to) < parseDate(x.from)).length;
+  const pushed = newChanges.filter(x=> parseDate(x.to) > parseDate(x.from)).length;
+
+  const bits = [];
+  if(unresolved>0) bits.push(`⚠️ <strong>${unresolved}</strong> unresolved missing items across <strong>${jobs}</strong> job(s)`);
+  if(newChanges.length>0) bits.push(`⚠️ <strong>${newChanges.length}</strong> date changes since last review — ${pulled} pulled forward, ${pushed} pushed back.`);
+
+  if(bits.length){
+    banner.innerHTML = bits.join(' &nbsp;&nbsp;•&nbsp;&nbsp; ') + ' &nbsp;&nbsp;<button class="btn" id="ackBanner">Acknowledge</button>';
+    banner.classList.add('show');
+    document.getElementById('ackBanner').onclick = ()=>{
+      localStorage.setItem(LS_KEYS.SEEN_CHANGES_AT, nowISO());
+      banner.classList.remove('show');
+      AzureSync.schedulePush?.();
+    };
+  }else{
+    banner.classList.remove('show');
+  }
+}
+
+/* ======================= Cloud Sync (SWA Functions) ======================= */
+const AzureSync = (()=> {
+  let wsId = null, etag = "", pollT = null, pushing = false;
+
+  async function pull() {
+    if (!wsId) return;
+    const res = await fetch(`/api/state?workspaceId=${encodeURIComponent(wsId)}`, {
+      method: 'GET',
+      headers: etag ? { 'If-None-Match': etag } : {}
+    });
+    if (res.status === 304) return;
+    if (!res.ok) { document.getElementById('wsStatus').textContent = `Pull error ${res.status}`; return; }
+    const j = await res.json();
+    etag = j.etag || "";
+    if (j.state && typeof j.state === 'object') {
+      if (j.state.store) localStorage.setItem(LS_KEYS.EVENTS, JSON.stringify(j.state.store));
+      if (j.state.completed) localStorage.setItem(LS_KEYS.COMPLETED, JSON.stringify(j.state.completed));
+      if (j.state.changelog) localStorage.setItem(LS_KEYS.CHANGELOG, JSON.stringify(j.state.changelog));
+      if (j.state.notes) localStorage.setItem(LS_KEYS.NOTES, JSON.stringify(j.state.notes));
+      if (j.state.missing) localStorage.setItem(LS_KEYS.MISSING, JSON.stringify(j.state.missing));
+      if (j.state.attachments) localStorage.setItem(LS_KEYS.ATTACH, JSON.stringify(j.state.attachments));
+      if (j.state.seenChangesAt) localStorage.setItem(LS_KEYS.SEEN_CHANGES_AT, j.state.seenChangesAt);
+      rebuildCalendar?.();
+      attentionBanner?.();
+      document.getElementById('wsStatus').textContent = `Synced ${new Date().toLocaleTimeString()}`;
+    }
+  }
+
+  async function pushNow() {
+    if (!wsId || pushing) return;
+    pushing = true;
+    try {
+      const state = {
+        store: loadStore(),
+        completed: loadCompleted(),
+        changelog: loadChangelog(),
+        notes: loadNotes(),
+        missing: loadMissing(),
+        attachments: loadAttach(),
+        seenChangesAt: localStorage.getItem(LS_KEYS.SEEN_CHANGES_AT)||null
+      };
+      const res = await fetch('/api/state', {
+        method: 'POST',
+        headers: {'content-type':'application/json'},
+        body: JSON.stringify({ workspaceId: wsId, state, etag })
+      });
+      if (res.status === 412) { await pull(); return; } // ETag mismatch
+      if (!res.ok) { document.getElementById('wsStatus').textContent = `Save error ${res.status}`; return; }
+      const j = await res.json(); etag = j.etag || "";
+      document.getElementById('wsStatus').textContent = `Saved ${new Date().toLocaleTimeString()}`;
+    } finally { pushing = false; }
+  }
+
+  let pushTimer=null;
+  function schedulePush() {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, 500);
+  }
+
+  function startPolling() {
+    if (pollT) clearInterval(pollT);
+    pollT = setInterval(pull, 3000);
+    pull();
+  }
+
+  async function connect(id) {
+    wsId = (id||"").trim();
+    if(!wsId){ document.getElementById('wsStatus').textContent = 'Enter Workspace ID'; return; }
+    localStorage.setItem(LS_KEYS.WS_ID, wsId);
+    document.getElementById('wsStatus').textContent = 'Connecting…';
+    await pull();
+    startPolling();
+    document.getElementById('wsStatus').textContent = `Connected: ${wsId}`;
+  }
+
+  return { connect, schedulePush, pull, pushNow };
+})();
+
+/* wrap savers so they also push */
+const _saveStore = saveStore, _saveCompleted = saveCompleted, _saveChangelog = saveChangelog, _saveNotes = saveNotes, _saveMissing = saveMissing, _saveAttach = saveAttach;
+window.saveStore = (x)=>{ _saveStore(x); AzureSync.schedulePush(); };
+window.saveCompleted = (x)=>{ _saveCompleted(x); AzureSync.schedulePush(); };
+window.saveChangelog = (x)=>{ _saveChangelog(x); AzureSync.schedulePush(); };
+window.saveNotes = (x)=>{ _saveNotes(x); AzureSync.schedulePush(); };
+window.saveMissing = (x)=>{ _saveMissing(x); AzureSync.schedulePush(); };
+window.saveAttach = (x)=>{ _saveAttach(x); AzureSync.schedulePush(); };
+
+/* ======================= UI wiring ======================= */
+document.getElementById('apply').addEventListener('click', run);
+document.getElementById('exportCsv').addEventListener('click', ()=> exportStartsCSV(STARTS_ROWS_VIEW));
+document.getElementById('export84').addEventListener('click', ()=> export84Matches(STARTS_ROWS_VIEW, ROWS_84));
+document.getElementById('showCal').addEventListener('click', rebuildCalendar);
+document.getElementById('exportList').addEventListener('click', exportListScheduleCSV);
+document.getElementById('exportICS').addEventListener('click', exportICS);
+document.getElementById('exportLog').addEventListener('click', ()=>{
+  const logArr = loadChangelog();
+  if(!logArr.length){ alert("No date changes recorded yet."); return; }
+  const headers = ["ID","From","To","Changed At","Subdivision","Lot","Task","Builder","Address","Source"];
+  const rows = logArr.map(e=>{
+    const s = e.snapshot || {};
+    return [e.id, e.from, e.to, e.changedAt, s.subdivision||"", s.lot||"", s.task||"", s.builder||"", s.address||"", s.source||""];
+  });
+  const csv = [headers].concat(rows).map(r=> r.map(x=>('"'+String(x??"").replace(/"/g,'""')+'"')).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download="date_change_log.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+document.getElementById('exportBackup').addEventListener('click', exportBackup);
+document.getElementById('importBackupBtn').addEventListener('click', ()=> document.getElementById('importBackupFile').click());
+document.getElementById('importBackupFile').addEventListener('change', (e)=> importBackup(e.target.files[0]));
+
+document.getElementById('includeStored').addEventListener('change', ()=>{ populateSubdatalist(); rebuildCalendar(); });
+document.getElementById('hideCompleted').addEventListener('change', rebuildCalendar);
+['srcBWP','srcSP','srcVEND','srcASHTON'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', ()=>{ sourceToggles(); rebuildCalendar(); });
+});
+document.querySelectorAll('input[name="colorby"]').forEach(r=>{
+  r.addEventListener('change', ()=>{ saveJSON(LS_KEYS.COLORBY, getColorBy()); rebuildCalendar(); });
+});
+(function restoreColorBy(){ const by = loadJSON(LS_KEYS.COLORBY, "source"); const radio = document.querySelector(`input[name="colorby"][value="${by}"]`); if(radio) radio.checked = true; })();
+(function restoreSources(){
+  const src = loadJSON(LS_KEYS.SOURCES, {BWP:true,SUPPLYPRO:true,"VENDOR SUITE":true,"ASHTON PORTAL":true});
+  document.getElementById('srcBWP').checked=!!src.BWP;
+  document.getElementById('srcSP').checked=!!src.SUPPLYPRO;
+  document.getElementById('srcVEND').checked=!!src["VENDOR SUITE"];
+  document.getElementById('srcASHTON').checked=!!src["ASHTON PORTAL"];
+})();
+
+document.getElementById('filterCal').addEventListener('click', ()=>{
+  const val = normSpace(document.getElementById('subSearch').value); if(!val) return;
+  const exact = findExactSubdivision(val, collectSubdivisions());
+  if(exact) addSubFilter(exact, {jump:true}); else alert('No exact subdivision match found.');
+  document.getElementById('subSearch').value = "";
+});
+document.getElementById('resetFilter').addEventListener('click', clearSubFilters);
+const onTypeAdd = debounce(()=>{
+  const inp = document.getElementById('subSearch'); const val = (inp.value || "").trim(); if(!val) return;
+  const exact = findExactSubdivision(val, collectSubdivisions());
+  if(exact){ addSubFilter(exact, {jump:true}); inp.value = ""; }
+}, 150);
+document.getElementById('subSearch').addEventListener('change', onTypeAdd);
+document.getElementById('subSearch').addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); onTypeAdd(); } });
+
+document.getElementById('clear').addEventListener('click', ()=>{
+  document.getElementById('bwp').value="";
+  document.getElementById('sp').value="";
+  document.getElementById('vendor').value="";
+  document.getElementById('s84').value="";
+  document.getElementById('ashton').value="";
+  document.getElementById('chips').innerHTML="";
+  document.getElementById('results').innerHTML="";
+  statusEl.innerHTML="";
+  document.getElementById('calendar').innerHTML="";
+  if(_calendarInstance){ _calendarInstance.destroy(); _calendarInstance=null; }
+  STARTS_ROWS_ALL=[]; STARTS_ROWS_VIEW=[]; ROWS_84=[]; HEADERS_84=null; PRIMARY_ADDR_COL_84=null;
+  clearSubFilters();
+});
+
+document.getElementById('bwp').addEventListener('change', ()=>{ log("BWP selected.","muted"); run(); });
+document.getElementById('sp').addEventListener('change', ()=>{ log("SupplyPro selected (address cleaner active).","muted"); run(); });
+document.getElementById('vendor').addEventListener('change', ()=>{ log("Vendor Suite selected (DR — North/South/Polk/Lake).","muted"); run(); });
+document.getElementById('ashton').addEventListener('change', ()=>{ log("Ashton Portal selected.","muted"); run(); });
+document.getElementById('s84').addEventListener('change', async (e)=>{ const f = e.target.files[0]; ROWS_84 = f ? await parse84Csv(f) : []; });
+
+['onlyScreens','onlyDrywall','includeScreens','includeDeliveries'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', run);
+});
+
+/* Cloud Sync UI wiring + auto-connect */
+document.getElementById('wsConnect').addEventListener('click', ()=>{
+  const id = normSpace(document.getElementById('wsId').value);
+  AzureSync.connect(id);
+});
+(function autoConnect(){
+  const url = new URL(location.href);
+  const qws = url.searchParams.get('ws') || url.searchParams.get('workspace');
+  const saved = localStorage.getItem(LS_KEYS.WS_ID);
+  const want = qws || saved || "";
+  if(want){
+    document.getElementById('wsId').value = want;
+    AzureSync.connect(want);
+  }
+})();
+
+/* defaults */
+(function initDates(){
+  const today = new Date();
+  const toISO = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0');
+  const plus = new Date(today.getFullYear(), today.getMonth(), today.getDate()+60);
+  document.getElementById('dFrom').value = toISO(today);
+  document.getElementById('dTo').value   = toISO(plus);
+})();
+(function initialCalendar(){ populateSubdatalist(); updateSelectedTags(); rebuildCalendar(); attentionBanner(); })();
+</script>
+</body>
+</html>
