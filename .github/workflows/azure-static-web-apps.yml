@@ -2,7 +2,7 @@ name: Azure Static Web Apps CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -11,17 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: Azure/static-web-apps-deploy@v1
+      - name: Build and Deploy
+        uses: Azure/static-web-apps-deploy@v1
         with:
-          # 👇 this must match the secret name you already have
+          action: "upload"   # <— THIS fixes “deployment_action was not provided”
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_BLACK_ROCK_04CD9FB0F }}
-
-          # Your site lives in /OneCalendar (where index.html is)
-          app_location: /OneCalendar
-
-          # We’re not building anything—serve files as-is
-          output_location: /
+          app_location: "OneCalendar"   # folder that contains index.html (no leading slash)
+          output_location: ""           # no build output folder
           skip_app_build: true
-
-          # No backend yet
           skip_api_build: true
