@@ -13,7 +13,7 @@ jobs:
         with:
           action: upload
           # Use the secret you will add in step C below
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ AZURE_STATIC_WEB_APPS_API_TOKEN }}
           app_location: "/"     # index.html is at repository root
           output_location: ""   # no build folder
           skip_app_build: true
